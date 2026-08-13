@@ -39,7 +39,64 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
 - Twilio WhatsApp sandbox (parent notifications)
 
 ## Setup
- TODO:
+
+Requires Python 3.12+ and a Supabase project.
+
+```bash
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+# create .env (see below), then:
+python manage.py migrate
+**python manage.py createsuperuser**   # prompts for email and role (might disable permission)
+python manage.py runserver
+```
+
+Then visit `/accounts/register/`, create one account per role, and confirm each
+lands on its own dashboard.
+
+### Environment variables
+
+`.env` in the project root, never committed:
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `SECRET_KEY` | yes | Django signing key. The project refuses to start without it. |
+| `DEBUG` | no | Defaults to `False`. |
+| `DATABASE_URL` | yes | Supabase Postgres connection string. |
+| `ALLOWED_HOSTS` | no | Comma-separated. Defaults to `localhost,127.0.0.1`. |
+| `TIME_ZONE` | no | Defaults to `Africa/Johannesburg`. |
+| `DB_CONN_MAX_AGE` | no | Seconds to reuse a connection. Defaults to `0`. |
+| `TEST_ON_POSTGRES` | no | See Tests below. |
+
+### A note on the Supabase connection string
+
+Copy the **Session pooler** string from Supabase (Connect → Session pooler),
+not the direct `db.<ref>.supabase.co` one. The direct host resolves to IPv6
+only, so on an IPv4-only network it fails with `Network is unreachable`, which
+reads like a credentials problem but is not one.
+
+Two things to watch for when pasting it in:
+
+- Replace the whole `[YOUR-PASSWORD]` placeholder, brackets included.
+- If your password contains `@`, `#`, `/`, or `?`, percent-encode it
+  (`@` becomes `%40`). The parser in `config/db.py` tolerates both of these
+  mistakes, but other Postgres tools will not.
+
+### Tests
+
+```bash
+python manage.py test
+```
+
+Runs against in-memory SQLite so the suite finishes in under a second and works
+without a database connection. To run the same suite against Supabase:
+
+```bash
+TEST_ON_POSTGRES=True python manage.py test --keepdb
+```
+
+`--keepdb` is required: Supabase's pooler holds a session open, which stops
+Django from dropping the test database afterwards.
 
 ## Built with Kiro
 
