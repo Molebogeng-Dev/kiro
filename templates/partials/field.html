@@ -1,0 +1,25 @@
+{% comment %}
+One form field, rendered for legibility.
+
+Help text carries the id Django's own aria-describedby points at, so a screen
+reader announces the guidance with the input rather than after it. Errors sit
+above the input, where someone scanning downward meets the problem before the
+box they need to fix.
+{% endcomment %}
+<div class="form__field">
+  <label class="form__label" for="{{ field.id_for_label }}">
+    {{ field.label }}{% if field.field.required %} <span class="form__required" aria-hidden="true">*</span><span class="visually-hidden">(required)</span>{% endif %}
+  </label>
+
+  {% if field.errors %}
+    <ul class="form__errors" role="alert">
+      {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if field.help_text %}
+    <span class="form__help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</span>
+  {% endif %}
+
+  {{ field }}
+</div>

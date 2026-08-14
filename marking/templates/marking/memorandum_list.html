@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Memorandums &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Memorandums</h1>
+    <p class="page-head__lead">
+      Your marking guides. Every marked paper is judged against one of these.
+    </p>
+  </div>
+
+  <div class="button-row" style="margin-bottom:1.5rem">
+    <a class="button" href="{% url 'marking:memorandum_create' %}">Write a memorandum</a>
+  </div>
+
+  {% if memorandums %}
+    <ul class="record-list">
+      {% for memorandum in memorandums %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ memorandum.title }}</p>
+            <p class="record__meta">
+              {% if memorandum.subject %}{{ memorandum.subject }} &middot; {% endif %}
+              {% if memorandum.total_marks %}{{ memorandum.total_marks }} marks &middot; {% endif %}
+              written {{ memorandum.created_at|date:"j M Y" }}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if memorandum.paper_count %}
+              <span class="badge badge--neutral">
+                {{ memorandum.paper_count }} paper{{ memorandum.paper_count|pluralize }} marked
+              </span>
+            {% else %}
+              <span class="badge badge--neutral">Not used yet</span>
+            {% endif %}
+            {% if memorandum.assignment_count %}
+              <span class="badge badge--neutral">
+                {{ memorandum.assignment_count }} assignment{{ memorandum.assignment_count|pluralize }}
+              </span>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No memorandums yet</h3>
+      <p class="empty__body">
+        A memorandum is the marking guide iSgela reads a paper against. Writing
+        one takes about a minute, and you only do it once per test.
+      </p>
+      <a class="button" href="{% url 'marking:memorandum_create' %}">Write your first memorandum</a>
+    </div>
+  {% endif %}
+{% endblock %}

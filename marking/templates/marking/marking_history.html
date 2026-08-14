@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Marked papers &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Marked papers</h1>
+    <p class="page-head__lead">Everything you have marked, newest first.</p>
+  </div>
+
+  {% if papers %}
+    <ul class="summary-row">
+      <li><strong class="tabular">{{ papers|length }}</strong> in total</li>
+      <li><strong class="tabular">{{ marked_count }}</strong> marked</li>
+      {% if failed_count %}
+        <li><strong class="tabular">{{ failed_count }}</strong> need another try</li>
+      {% endif %}
+    </ul>
+
+    <ul class="record-list">
+      {% for paper in papers %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ paper.belongs_to_display }}</p>
+            <p class="record__meta">
+              {{ paper.memorandum.title }} &middot; {{ paper.created_at|date:"j M Y, H:i" }}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if paper.status == 'marked' %}
+              <span class="record__score tabular">
+                {{ paper.result.marks_awarded|floatformat }}/{{ paper.result.marks_available|floatformat }}
+              </span>
+              {% if paper.result.percentage is not None %}
+                <span class="muted tabular">{{ paper.result.percentage|floatformat:0 }}%</span>
+              {% endif %}
+              <span class="badge badge--marked">Marked</span>
+            {% elif paper.status == 'failed' %}
+              <span class="badge badge--failed">Marking failed</span>
+            {% else %}
+              <span class="badge badge--pending">Waiting</span>
+            {% endif %}
+            <a class="button button--secondary" href="{% url 'marking:paper_detail' paper.pk %}">
+              {% if paper.status == 'marked' %}See feedback{% else %}Open{% endif %}
+            </a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">You have not marked anything yet</h3>
+      <p class="empty__body">
+        Once you mark a paper it appears here, with the score and the feedback
+        for every question.
+      </p>
+      <a class="button" href="{% url 'marking:mark_paper' %}">Mark a paper</a>
+    </div>
+  {% endif %}
+{% endblock %}

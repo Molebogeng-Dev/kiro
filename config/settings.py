@@ -62,6 +62,8 @@ LOCAL_APPS = [
     "core",
     # Papers, memorandums, and the AI marking engine.
     "marking",
+    # Assignments and study material a teacher posts for learners.
+    "classroom",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
@@ -70,9 +72,10 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     # Serves collected static files from the application process. Needed because
     # gunicorn will not do it, and without it the Django admin renders unstyled.
-    # Memorandum authoring is admin-only for now, so that is not cosmetic.
-    # In development Django's staticfiles app handles this instead.
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # In development Django's staticfiles app handles this instead. Left out
+    # under test, where there is no collected static directory and it would only
+    # warn about its absence.
+    *([] if RUNNING_TESTS else ["whitenoise.middleware.WhiteNoiseMiddleware"]),
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -198,6 +201,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

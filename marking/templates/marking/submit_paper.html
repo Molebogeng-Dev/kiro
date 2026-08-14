@@ -1,25 +1,43 @@
 {% extends "base.html" %}
 
-{% block title %}Mark a paper &middot; iSgela{% endblock %}
+{% block title %}Mark a paper (JSON) &middot; iSgela{% endblock %}
 
 {% block content %}
-  <h1>Mark a paper</h1>
-  <p>
-    Sprint 2 test harness for the marking engine. Pick a memorandum, attach a photo
-    of a paper, and the response is the raw marking JSON. The teacher and student
-    versions of this flow arrive in Sprints 3 and 4.
-  </p>
-  <p>Currently marking with <code>{{ model }}</code>.</p>
+  <div class="page-head">
+    <h1>Mark a paper</h1>
+    <p class="page-head__lead">
+      Developer endpoint from Sprint 2: it returns raw marking JSON rather than a
+      page. The version teachers use is
+      <a href="{% url 'marking:mark_paper' %}">Mark a paper</a> in the menu, which
+      also records whose work it is.
+    </p>
+  </div>
 
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    {{ form.as_p }}
-    <button type="submit">Mark it</button>
-  </form>
+  <div class="alert alert--info" role="status">
+    <span class="alert__label">Note:</span>
+    <span>Currently marking with <code>{{ model }}</code>.</span>
+  </div>
 
-  <p>
-    Marking runs while you wait and can take up to a minute, since the image is
-    sent to the vision model and read question by question.
-  </p>
+  <div class="panel">
+    <form method="post" enctype="multipart/form-data" class="form" data-busy novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <ul class="form__errors" role="alert">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.memorandum %}
+      {% include "partials/field.html" with field=form.image %}
+
+      <div class="form__actions">
+        <button type="submit" class="button" data-busy-button data-busy-label="Marking…">
+          Mark it
+        </button>
+        <p class="form__help" data-busy-note hidden>
+          Marking takes up to a minute.
+        </p>
+      </div>
+    </form>
+  </div>
 {% endblock %}

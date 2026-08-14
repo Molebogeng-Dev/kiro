@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Student dashboard &middot; iSgela{% endblock %}
+{% block title %}Home &middot; iSgela{% endblock %}
 
 {% block content %}
-  <h1>Welcome, Student</h1>
-  <p>This is a placeholder. Homework submission and study materials land in later sprints.</p>
+  <div class="page-head">
+    <h1>Welcome, Student</h1>
+    <p class="page-head__lead">
+      Your homework, study material, and feedback will appear here.
+    </p>
+  </div>
+
+  <div class="empty">
+    <h3 class="empty__title">Nothing here yet</h3>
+    <p class="empty__body">
+      Your teachers can already set assignments and post study material. Being
+      able to open them, and to photograph your homework so it gets marked, is
+      the next thing being built.
+    </p>
+  </div>
 {% endblock %}

@@ -1,8 +1,106 @@
 {% extends "base.html" %}
 
-{% block title %}Teacher dashboard &middot; iSgela{% endblock %}
+{% block title %}Home &middot; iSgela{% endblock %}
 
 {% block content %}
-  <h1>Welcome, Teacher</h1>
-  <p>This is a placeholder. Marking, classes, and attendance land in later sprints.</p>
+  <div class="page-head">
+    <h1>Welcome, Teacher</h1>
+    <p class="page-head__lead">
+      {% if first_name %}Good to see you, {{ first_name }}. {% endif %}Start where you need to.
+    </p>
+  </div>
+
+  {% comment %}
+    Actions come first and are large. The most common task on this screen is
+    marking a paper, so it sits first and is the only one with the filled style.
+  {% endcomment %}
+  <ul class="action-grid">
+    <li>
+      <a class="action-card" href="{% url 'marking:mark_paper' %}">
+        <span class="action-card__title">Mark a paper</span>
+        <span class="action-card__hint">
+          Photograph a learner's paper and get marks with feedback on every question.
+        </span>
+        <span class="action-card__go">Start marking &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'marking:memorandum_create' %}">
+        <span class="action-card__title">Write a memorandum</span>
+        <span class="action-card__hint">
+          The marking guide: each question, the answer you expect, and the marks.
+        </span>
+        <span class="action-card__go">Write one &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'classroom:assignment_create' %}">
+        <span class="action-card__title">Set an assignment</span>
+        <span class="action-card__hint">
+          Post work for your learners, with the memorandum that marks it.
+        </span>
+        <span class="action-card__go">Set work &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'classroom:material_create' %}">
+        <span class="action-card__title">Post study material</span>
+        <span class="action-card__hint">
+          Notes or explanations your learners can read in their own time.
+        </span>
+        <span class="action-card__go">Post material &rarr;</span>
+      </a>
+    </li>
+  </ul>
+
+  <h2>Recently marked</h2>
+
+  {% if recent_papers %}
+    <ul class="record-list">
+      {% for paper in recent_papers %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ paper.belongs_to_display }}</p>
+            <p class="record__meta">
+              {{ paper.memorandum.title }} &middot; {{ paper.created_at|date:"j M Y, H:i" }}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if paper.status == 'marked' %}
+              <span class="record__score tabular">
+                {{ paper.result.marks_awarded|floatformat }}/{{ paper.result.marks_available|floatformat }}
+              </span>
+              <span class="badge badge--marked">Marked</span>
+            {% elif paper.status == 'failed' %}
+              <span class="badge badge--failed">Marking failed</span>
+            {% else %}
+              <span class="badge badge--pending">Waiting</span>
+            {% endif %}
+            <a class="button button--secondary" href="{% url 'marking:paper_detail' paper.pk %}">Open</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <p style="margin-top:1rem">
+      <a href="{% url 'marking:marking_history' %}">See all marked papers</a>
+    </p>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">Nothing marked yet</h3>
+      <p class="empty__body">
+        {% if has_memorandums %}
+          You have a memorandum ready. Photograph a learner's paper and iSgela will
+          mark it against that guide.
+        {% else %}
+          Write a memorandum first, then you can mark papers against it.
+        {% endif %}
+      </p>
+      {% if has_memorandums %}
+        <a class="button" href="{% url 'marking:mark_paper' %}">Mark your first paper</a>
+      {% else %}
+        <a class="button" href="{% url 'marking:memorandum_create' %}">Write your first memorandum</a>
+      {% endif %}
+    </div>
+  {% endif %}
 {% endblock %}

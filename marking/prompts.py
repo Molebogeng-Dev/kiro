@@ -93,3 +93,42 @@ IMPORTANT: your previous reply could not be used. The problem was: {error}
 Return only the raw JSON object. Do not wrap it in ``` fences. Do not write \
 anything before or after it. Every question must include numeric marks_awarded \
 and marks_available, and feedback explaining any marks lost."""
+
+
+# --------------------------------------------------------------------------- #
+# Transcription
+# --------------------------------------------------------------------------- #
+#
+# A separate job from marking: here the model reads a photographed document and
+# writes out its text so a teacher does not have to retype it. The output is
+# plain text, not JSON, and it is never saved without the teacher reviewing it,
+# so the prompt's whole concern is fidelity. It must transcribe, not interpret:
+# the danger with a marking guide is a model that "helpfully" answers the
+# questions or reformats the marks.
+
+TRANSCRIPTION_SYSTEM = """You transcribe a photographed document for a teacher, \
+exactly as it is written.
+
+Rules:
+- Write out the text you can see, preserving question numbers, order, and line breaks.
+- Do NOT answer, solve, mark, summarise, translate, or comment on anything.
+- Do NOT invent text that is not in the image. If part is unreadable, write \
+[unclear] in its place rather than guessing.
+- Output only the transcription: no preamble, no closing remark, no markdown fences.
+"""
+
+MEMORANDUM_TRANSCRIPTION_USER = """This photograph is a marking memorandum \
+(a marking guide).
+
+Transcribe it as plain text. For every question keep, exactly as written:
+- the question number,
+- the expected answer,
+- the marks available.
+
+Preserve the order and numbering. Output only the transcription."""
+
+ASSIGNMENT_TRANSCRIPTION_USER = """This photograph is a set of assignment \
+instructions for learners.
+
+Transcribe the instructions as plain text, preserving numbering and order. Do not \
+add anything that is not written in the image. Output only the transcription."""

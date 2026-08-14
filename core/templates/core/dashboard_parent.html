@@ -1,21 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}Parent dashboard &middot; iSgela{% endblock %}
+{% block title %}Home &middot; iSgela{% endblock %}
 
 {% block content %}
-  <h1>Welcome, Parent</h1>
-  <p>This is a placeholder. Your child's marked work, attendance, and notifications land in later sprints.</p>
+  <div class="page-head">
+    <h1>Welcome, Parent</h1>
+    <p class="page-head__lead">
+      Your child's marked work, attendance, and progress will appear here.
+    </p>
+  </div>
 
   {% with children=user.children %}
     {% if children %}
-      <h2>Linked learners</h2>
-      <ul>
+      <h2>Your learners</h2>
+      <ul class="record-list">
         {% for child in children %}
-          <li>{{ child.get_full_name|default:child.username }}</li>
+          <li class="record">
+            <div class="record__main">
+              <p class="record__title">{{ child.get_full_name|default:child.username }}</p>
+              <p class="record__meta">Linked to your account</p>
+            </div>
+          </li>
         {% endfor %}
       </ul>
     {% else %}
-      <p>No learner is linked to your account yet. An administrator can link one for you.</p>
+      <div class="empty">
+        <h3 class="empty__title">No learner linked yet</h3>
+        <p class="empty__body">
+          Once your child's account is linked to yours, their marked work and
+          attendance will show up here automatically.
+        </p>
+      </div>
     {% endif %}
   {% endwith %}
 {% endblock %}

@@ -37,11 +37,11 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
   This is a deliberate scope decision for the hackathon timeline, not an oversight.
 
 - **Static files are served by the application process.**
-  WhiteNoise sits in the middleware so the Django admin renders styled from a
-  single container, which matters while memorandum authoring is admin-only. For
-  anything beyond a demo this belongs behind a reverse proxy or CDN rather than
-  in the Python process. Revisit during the security and hardening pass, along
-  with `manage.py check --deploy`, HSTS, and secure cookie settings.
+  WhiteNoise sits in the middleware so the interface stylesheet and the Django
+  admin both render from a single container. For anything beyond a demo this
+  belongs behind a reverse proxy or CDN rather than in the Python process.
+  Revisit during the security and hardening pass, along with
+  `manage.py check --deploy`, HSTS, and secure cookie settings.
 
 ## Tech stack
 
@@ -176,6 +176,67 @@ A failure never loses the submission. The `Paper` is kept with
 Marking runs synchronously and can take up to a minute. Moving it to a
 background worker is a scaling concern for after the hackathon.
 
+## The teacher portal
+
+`marking/` and `classroom/` hold the teacher-facing pages added in Sprint 3. None
+of them contain marking logic: every upload goes through
+`marking/submissions.py`, which is the single path from a file to a marked paper,
+shared with Sprint 2's JSON endpoint.
+
+| Page | Path |
+| --- | --- |
+| Dashboard | `/teacher/` |
+| Mark a paper | `/marking/mark/` |
+| Marked papers | `/marking/papers/` |
+| One paper's feedback | `/marking/papers/<id>/` |
+| Memorandums | `/marking/memorandums/` |
+| Assignments | `/classroom/assignments/` |
+| Study material | `/classroom/materials/` |
+
+Every one rejects non-teachers at the view with the Sprint 1 `role_required`
+decorator, and each is scoped to the teacher who created the record: papers,
+memorandums, assignments, and material are all filtered by owner. Without class
+or roster structure, ownership of the submission is the only boundary available,
+and it is a better default than letting any teacher read any learner's marked
+work.
+
+A `Paper` now records the learner it belongs to as well as who uploaded it. A
+teacher marking a class set is not the author of any of it, and a mark that is not
+attached to a learner cannot reach them or their parent later.
+
+### Typing, or photographing, a memorandum or assignment
+
+A teacher can write a memorandum or an assignment's instructions by hand, or
+upload a photo and have the vision model transcribe it into the form. This reuses
+the Sprint 2 image pipeline and the same model, but asks for plain text rather
+than JSON, and it lives in `marking/transcription.py`.
+
+Two deliberate differences from marking. First, the result is never saved on its
+own: it pre-fills the form for the teacher to review and correct before saving,
+because OCR misreads and a silently altered marking guide is worse than one typed
+by hand. Second, the source photo is not stored — it is only a means of getting
+text. If the model is unreachable or rate limited, the teacher gets a plain
+message and the typing fields are still right there, so they are never stuck.
+
+### When marking fails in the interface
+
+The result page doubles as the failure page. It explains what happened in plain
+language, with no provider names or status codes, confirms the photo is still
+stored, and offers a retry button that re-marks from storage so the teacher does
+not have to photograph the page again. The button is withheld for the two
+failures that retrying cannot fix — an empty account and a withdrawn model — since
+those repeat identically until somebody changes a setting.
+
+### Interface notes
+
+Written for a teacher who may be in their sixties and did not ask for more
+software: body text starts at 18px, every control is at least 48px tall, status
+is always a word as well as a colour, and there is one obvious primary action per
+screen. `static/js/isgela.js` is small and optional — it adds a type-to-narrow
+box to the learner picker, confirms which photo was chosen, and shows progress
+while marking runs, which matters because marking is synchronous and takes up to
+a minute. Every page works with JavaScript blocked.
+
 ### Task runner
 
 `run.sh` wraps the common commands and finds the virtualenv itself:
@@ -272,8 +333,8 @@ Notes on the image:
   apply the same migration. For a single demo container, switch them on.
 - Gunicorn runs with `--timeout 180`. Marking is synchronous and a paper can take
   up to a minute, which the 30 second default would kill.
-- WhiteNoise serves collected static files, so the Django admin renders styled.
-  That is not cosmetic while memorandum authoring is admin-only.
+- WhiteNoise serves collected static files. Without it the interface loads
+  unstyled, so this is not cosmetic.
 
 ## Built with Kiro
 

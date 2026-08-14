@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Mark a paper &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Mark a paper</h1>
+    <p class="page-head__lead">
+      Choose the learner, choose the memorandum, and add a photo of the page.
+      iSgela reads the paper and marks it question by question.
+    </p>
+  </div>
+
+  {% if not has_memorandums %}
+    {# Nothing can be marked without a guide, so say it before they fill the form in. #}
+    <div class="alert alert--warning" role="status">
+      <span class="alert__label">First:</span>
+      <span>
+        You need a memorandum before you can mark anything.
+        <a href="{% url 'marking:memorandum_create' %}">Write one now</a> — it takes a minute.
+      </span>
+    </div>
+  {% endif %}
+
+  <div class="panel">
+    <form method="post" enctype="multipart/form-data" class="form" data-busy novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <ul class="form__errors" role="alert">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.student %}
+      {% include "partials/field.html" with field=form.memorandum %}
+      {% include "partials/field.html" with field=form.image %}
+
+      <div class="form__actions">
+        <button type="submit" class="button button--block" data-busy-button
+                data-busy-label="Marking, please wait…">
+          Mark this paper
+        </button>
+        <p class="form__help" data-busy-note hidden>
+          Reading the handwriting takes up to a minute. Please stay on this page —
+          there is no need to press the button again.
+        </p>
+        <p class="form__help">
+          Marking usually takes 20 to 60 seconds.
+        </p>
+      </div>
+    </form>
+  </div>
+{% endblock %}

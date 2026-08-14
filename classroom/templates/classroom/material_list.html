@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Study material &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Study material</h1>
+    <p class="page-head__lead">What you have posted for your learners to read.</p>
+  </div>
+
+  <div class="button-row" style="margin-bottom:1.5rem">
+    <a class="button" href="{% url 'classroom:material_create' %}">Post study material</a>
+  </div>
+
+  {% if materials %}
+    <ul class="record-list">
+      {% for material in materials %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ material.title }}</p>
+            <p class="record__meta">
+              posted {{ material.created_at|date:"j M Y" }} &middot;
+              about {{ material.reading_time_minutes }} minute{{ material.reading_time_minutes|pluralize }} to read
+            </p>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No study material yet</h3>
+      <p class="empty__body">
+        Anything you post here your learners can open on a phone, using very
+        little data.
+      </p>
+      <a class="button" href="{% url 'classroom:material_create' %}">Post your first material</a>
+    </div>
+  {% endif %}
+{% endblock %}

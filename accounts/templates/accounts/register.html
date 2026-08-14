@@ -3,15 +3,34 @@
 {% block title %}Register &middot; iSgela{% endblock %}
 
 {% block content %}
-  <h1>Create your iSgela account</h1>
-  <p>Choose the role that describes you. It decides what you see after logging in.</p>
+  <div class="page-head">
+    <h1>Create your iSgela account</h1>
+    <p class="page-head__lead">
+      Choose the role that describes you. It decides what you see after logging in.
+    </p>
+  </div>
 
-  <form method="post" novalidate>
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    {{ form.as_p }}
-    <button type="submit">Create account</button>
-  </form>
+  <div class="panel">
+    <form method="post" class="form" novalidate>
+      {% csrf_token %}
 
-  <p>Already registered? <a href="{% url 'accounts:login' %}">Log in</a>.</p>
+      {% if form.non_field_errors %}
+        <ul class="form__errors" role="alert">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+
+      {% for field in form %}
+        {% include "partials/field.html" with field=field %}
+      {% endfor %}
+
+      <div class="form__actions">
+        <button type="submit" class="button button--block">Create account</button>
+      </div>
+    </form>
+
+    <p class="muted" style="margin-top:1.25rem;margin-bottom:0">
+      Already registered? <a href="{% url 'accounts:login' %}">Log in</a>.
+    </p>
+  </div>
 {% endblock %}

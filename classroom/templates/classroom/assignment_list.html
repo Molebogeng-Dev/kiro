@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Assignments &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Assignments</h1>
+    <p class="page-head__lead">Work you have set, newest first.</p>
+  </div>
+
+  <div class="button-row" style="margin-bottom:1.5rem">
+    <a class="button" href="{% url 'classroom:assignment_create' %}">Set an assignment</a>
+  </div>
+
+  {% if assignments %}
+    <ul class="record-list">
+      {% for assignment in assignments %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ assignment.title }}</p>
+            <p class="record__meta">
+              Marked against {{ assignment.memorandum.title }} &middot;
+              set {{ assignment.created_at|date:"j M Y" }}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if assignment.due_date %}
+              {% if assignment.is_past_due %}
+                <span class="badge badge--failed">Due {{ assignment.due_date|date:"j M" }}, passed</span>
+              {% else %}
+                <span class="badge badge--pending">Due {{ assignment.due_date|date:"j M Y" }}</span>
+              {% endif %}
+            {% else %}
+              <span class="badge badge--neutral">No deadline</span>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No assignments yet</h3>
+      <p class="empty__body">
+        Set work here and your learners will see it in their portal, with the
+        instructions you write.
+      </p>
+      <a class="button" href="{% url 'classroom:assignment_create' %}">Set your first assignment</a>
+    </div>
+  {% endif %}
+{% endblock %}

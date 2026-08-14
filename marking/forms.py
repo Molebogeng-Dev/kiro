@@ -1,8 +1,27 @@
-"""Upload form for the marking test endpoint."""
+"""Forms for memorandum authoring and paper marking."""
 
 from django import forms
 
+from accounts.models import Role, User
+
 from .models import Memorandum
+
+
+def student_queryset():
+    """Every learner, ordered by the name a teacher would look for."""
+    return User.objects.filter(role=Role.STUDENT).order_by(
+        "first_name", "last_name", "username"
+    )
+
+
+class StudentChoiceField(forms.ModelChoiceField):
+    """A learner picker that shows names rather than usernames."""
+
+    def label_from_instance(self, student):
+        full_name = student.get_full_name()
+        if full_name:
+            return f"{full_name} ({student.username})"
+        return student.username
 
 
 class PaperUploadForm(forms.Form):
@@ -23,3 +42,103 @@ class PaperUploadForm(forms.Form):
         label="Photo of the paper",
         help_text="A JPEG or PNG photo. It will be rotated and compressed automatically.",
     )
+
+
+class TeacherMarkPaperForm(PaperUploadForm):
+    """The teacher-facing version: the same upload, plus whose work it is.
+
+    The learner is required here. A teacher marking a class set is not the author
+    of any of it, and a mark that is not attached to a learner cannot reach them
+    or their parent later, which is the entire point of the app.
+    """
+
+    student = StudentChoiceField(
+        queryset=User.objects.none(),
+        empty_label="Choose a learner",
+        label="Whose paper is this?",
+        help_text="Start typing a name to narrow the list.",
+    )
+
+    field_order = ["student", "memorandum", "image"]
+
+    def __init__(self, *args, teacher=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Evaluated per request, so a learner who registered a minute ago is
+        # already selectable.
+        self.fields["student"].queryset = student_queryset()
+        # A teacher marks against their own memorandums. Ownership is the only
+        # boundary the MVP has, and it keeps this consistent with the memorandum
+        # list, which is already per-teacher.
+        if teacher is not None:
+            self.fields["memorandum"].queryset = Memorandum.objects.filter(
+                created_by=teacher
+            ).order_by("-created_at")
+        self.fields["memorandum"].help_text = (
+            "The marking guide for this paper. Create one first if the list is empty."
+        )
+        self.fields["image"].label = "Photo of the paper"
+        self.fields["image"].help_text = (
+            "Take the photo straight on, with the whole page in the frame. "
+            "It is rotated and shrunk automatically."
+        )
+        self.fields["image"].widget.attrs.update(
+            {"accept": "image/jpeg,image/png", "capture": "environment"}
+        )
+        # Picked up by static/js/isgela.js, which adds a type-to-narrow box once
+        # the list is long enough to need one. Without JavaScript this is an
+        # ordinary select and still works.
+        self.fields["student"].widget.attrs.update(
+            {"data-filterable": "true", "data-filter-label": "Type a learner's name to narrow the list"}
+        )
+
+
+class MemorandumForm(forms.ModelForm):
+    """Teacher-facing memorandum authoring, replacing admin-only entry."""
+
+    class Meta:
+        model = Memorandum
+        fields = ["title", "subject", "total_marks", "content"]
+        labels = {
+            "title": "What is this memorandum for?",
+            "subject": "Subject",
+            "total_marks": "Total marks for the whole paper",
+            "content": "The marking guide",
+        }
+        help_texts = {
+            "title": "For example: Grade 4 Mathematics Test 1, Term 3.",
+            "subject": "Optional, but it helps the marking read subject notation correctly.",
+            "total_marks": "Optional. Used only as a sanity check on the marks that come back.",
+            "content": (
+                "One question at a time: the question number, the answer you "
+                "expect, and the marks it is worth. Plain typing is fine."
+            ),
+        }
+        widgets = {
+            "content": forms.Textarea(
+                attrs={
+                    "rows": 14,
+                    "placeholder": (
+                        "Question 1.1 (2 marks)\n"
+                        "What is 7 x 6?\n"
+                        "Expected answer: 42\n"
+                        "\n"
+                        "Question 1.2 (3 marks)\n"
+                        "A shop sells pens for R5 each. What do 8 pens cost? "
+                        "Show your working.\n"
+                        "Expected answer: 5 x 8 = R40. One mark for the "
+                        "multiplication, one for the answer, one for the rand sign."
+                    ),
+                }
+            ),
+            "title": forms.TextInput(attrs={"placeholder": "Grade 4 Mathematics Test 1"}),
+            "subject": forms.TextInput(attrs={"placeholder": "Mathematics"}),
+        }
+
+    def clean_content(self):
+        content = self.cleaned_data["content"].strip()
+        if len(content) < 20:
+            raise forms.ValidationError(
+                "This looks too short to mark against. Include at least one "
+                "question, the answer you expect, and the marks it is worth."
+            )
+        return content

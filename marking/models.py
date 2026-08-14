@@ -114,6 +114,21 @@ class Paper(models.Model):
         related_name="papers",
     )
 
+    # Whose work this is, as opposed to who uploaded it. A teacher marking a
+    # class set is not the author of any of it, and the result has to reach the
+    # right learner and later the right parent. Nullable because a paper can
+    # exist before anyone says whose it is, and because Sprint 2's endpoint
+    # predates this field.
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="papers_as_student",
+        null=True,
+        blank=True,
+        limit_choices_to={"role": Role.STUDENT},
+        help_text="The learner whose work this is.",
+    )
+
     image = models.ImageField(upload_to=paper_image_path, storage=papers_storage)
 
     status = models.CharField(
@@ -143,13 +158,25 @@ class Paper(models.Model):
         A parent account has no reason to upload a paper, and letting one do so
         would put a parent's submission into a learner's record.
         """
+        errors = {}
+
         if self.submitted_by_id and self.submitted_by.role not in {
             Role.TEACHER,
             Role.STUDENT,
         }:
-            raise ValidationError(
-                {"submitted_by": "Only teachers and students can submit papers."}
-            )
+            errors["submitted_by"] = "Only teachers and students can submit papers."
+
+        if self.student_id and self.student.role != Role.STUDENT:
+            errors["student"] = "A paper can only belong to a student account."
+
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def belongs_to_display(self) -> str:
+        """Whose work this is, for display. Falls back to the uploader."""
+        owner = self.student or self.submitted_by
+        return owner.get_full_name() or owner.username
 
     def record_failure(self, kind, detail):
         """Store why marking failed, keeping the submission itself intact."""
@@ -157,6 +184,61 @@ class Paper(models.Model):
         self.failure_kind = kind
         self.failure_detail = str(detail)[:2000]
         self.save(update_fields=["status", "failure_kind", "failure_detail", "updated_at"])
+
+    @property
+    def failure_message(self) -> str:
+        """What to tell the person looking at the screen.
+
+        Deliberately free of provider names, status codes, and the word "API".
+        A teacher needs to know whether to try again, take a better photo, or
+        fetch someone technical, and nothing else.
+        """
+        return FAILURE_ADVICE.get(
+            self.failure_kind,
+            "Marking did not finish. You can try again.",
+        )
+
+    @property
+    def is_retryable(self) -> bool:
+        """Whether trying again might plausibly work.
+
+        A withdrawn model or an empty account will fail identically until
+        somebody changes a setting, so the button is not offered there.
+        """
+        return self.failure_kind not in {
+            self.FailureKind.NO_CREDIT,
+            self.FailureKind.MODEL_UNAVAILABLE,
+        }
+
+
+# Plain-language advice per failure kind, for the person holding the phone.
+# Defined after Paper so it can use the choices, and read at call time by
+# Paper.failure_message.
+FAILURE_ADVICE = {
+    Paper.FailureKind.RATE_LIMITED: (
+        "The marking service is busy at the moment. Wait a minute, then try again."
+    ),
+    Paper.FailureKind.NO_CREDIT: (
+        "The marking service has run out of credit. Whoever set up iSgela for "
+        "your school needs to top it up before marking will work."
+    ),
+    Paper.FailureKind.MODEL_UNAVAILABLE: (
+        "The marking service is unavailable. This needs a settings change, so "
+        "trying again will not help — please report it."
+    ),
+    Paper.FailureKind.SERVICE_ERROR: (
+        "The marking service did not answer in time. This is usually temporary, "
+        "so please try again."
+    ),
+    Paper.FailureKind.INVALID_RESPONSE: (
+        "Marking came back in a form we could not read. Trying again often "
+        "works, and a clearer, straighter photo helps most."
+    ),
+    Paper.FailureKind.IMAGE_ERROR: (
+        "That photo could not be read. Take another one in better light, with "
+        "the whole page in the frame."
+    ),
+}
 
 
 class MarkingResult(models.Model):

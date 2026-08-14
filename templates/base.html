@@ -1,91 +1,102 @@
-<!DOCTYPE html>
-<html lang="en">
+{% load static %}<!DOCTYPE html>
+<html lang="en-ZA">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f6e5c">
   <title>{% block title %}iSgela{% endblock %}</title>
-  <style>
-    /* Deliberately minimal for Sprint 1: readable and keyboard-usable, not styled. */
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.5; }
-    .skip-link { position: absolute; left: -9999px; }
-    .skip-link:focus { left: 0.5rem; top: 0.5rem; padding: 0.5rem; background: #fff; color: #000; z-index: 10; }
-    header { border-bottom: 1px solid currentColor; padding: 0.75rem 1rem; }
-    .brand { font-weight: 700; text-decoration: none; color: inherit; }
-    nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 0.5rem 0 0; padding: 0; }
-    nav [aria-current="page"] { font-weight: 700; }
-    nav .soon { opacity: 0.6; font-size: 0.875rem; }
-    main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem; }
-    .messages { list-style: none; padding: 0; }
-    .messages li { border: 1px solid currentColor; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; }
-    .errorlist { color: #b00020; }
-    button, input[type="submit"] { padding: 0.4rem 0.9rem; cursor: pointer; }
-    form p { margin: 0 0 0.75rem; }
-    label { display: block; font-weight: 600; }
-    .helptext { display: block; font-weight: 400; font-size: 0.875rem; opacity: 0.8; }
-    .role-badge { font-size: 0.875rem; opacity: 0.8; }
-  </style>
+  <link rel="stylesheet" href="{% static 'css/isgela.css' %}">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
 
-  <header>
-    <a class="brand" href="{% url 'core:home' %}">iSgela</a>
+  <header class="site-header">
+    <div class="site-header__bar">
+      <a class="brand" href="{% url 'core:home' %}">
+        <span class="brand__mark" aria-hidden="true">iS</span>
+        <span>iSgela</span>
+      </a>
+
+      <div class="site-header__spacer"></div>
+
+      {% if user.is_authenticated %}
+        <p class="user-chip">
+          <span class="user-chip__name">{{ user.get_full_name|default:user.username }}</span>
+          <span>{{ user.get_role_display }}</span>
+        </p>
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="button button--secondary">Log out</button>
+        </form>
+      {% else %}
+        <a class="button button--secondary" href="{% url 'accounts:login' %}">Log in</a>
+        <a class="button" href="{% url 'accounts:register' %}">Register</a>
+      {% endif %}
+    </div>
 
     {% if user.is_authenticated %}
-      <span class="role-badge">
-        {{ user.get_full_name|default:user.username }} &middot; {{ user.get_role_display }}
-      </span>
-    {% endif %}
-
-    <nav aria-label="Main navigation">
-      <ul>
-        {% if user.is_authenticated %}
+      <nav class="site-nav" aria-label="Main navigation">
+        <ul class="site-nav__list">
           {% if user.dashboard_url_name %}
-            <li><a href="{% url user.dashboard_url_name %}">Dashboard</a></li>
+            <li>
+              <a class="site-nav__link" href="{% url user.dashboard_url_name %}"
+                 {% if nav_active == 'dashboard' %}aria-current="page"{% endif %}>Home</a>
+            </li>
           {% endif %}
 
-          {# Nav differs per role. Items still to be built are labelled, not linked. #}
           {% if user.is_teacher %}
-            <li class="soon">Mark a paper (Sprint 2)</li>
-            <li class="soon">My classes (Sprint 4)</li>
-            <li class="soon">Attendance (Sprint 5)</li>
-          {% elif user.is_student %}
-            <li class="soon">My homework (Sprint 3)</li>
-            <li class="soon">Study materials (Sprint 6)</li>
-          {% elif user.is_parent %}
-            <li class="soon">My children (Sprint 4)</li>
-            <li class="soon">Notifications (Sprint 7)</li>
+            <li>
+              <a class="site-nav__link" href="{% url 'marking:mark_paper' %}"
+                 {% if nav_active == 'mark' %}aria-current="page"{% endif %}>Mark a paper</a>
+            </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'marking:marking_history' %}"
+                 {% if nav_active == 'history' %}aria-current="page"{% endif %}>Marked papers</a>
+            </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'marking:memorandum_list' %}"
+                 {% if nav_active == 'memorandums' %}aria-current="page"{% endif %}>Memorandums</a>
+            </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'classroom:assignment_list' %}"
+                 {% if nav_active == 'assignments' %}aria-current="page"{% endif %}>Assignments</a>
+            </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'classroom:material_list' %}"
+                 {% if nav_active == 'materials' %}aria-current="page"{% endif %}>Study material</a>
+            </li>
           {% endif %}
 
           {% if user.is_staff %}
-            <li><a href="{% url 'admin:index' %}">Admin</a></li>
+            <li><a class="site-nav__link" href="{% url 'admin:index' %}">Admin</a></li>
           {% endif %}
-
-          <li>
-            <form method="post" action="{% url 'accounts:logout' %}">
-              {% csrf_token %}
-              <button type="submit">Log out</button>
-            </form>
-          </li>
-        {% else %}
-          <li><a href="{% url 'accounts:login' %}">Log in</a></li>
-          <li><a href="{% url 'accounts:register' %}">Register</a></li>
-        {% endif %}
-      </ul>
-    </nav>
+        </ul>
+      </nav>
+    {% endif %}
   </header>
 
   <main id="main">
     {% if messages %}
-      <ul class="messages" role="status" aria-live="polite">
+      <ul class="messages">
         {% for message in messages %}
-          <li>{{ message }}</li>
+          <li class="alert alert--{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}"
+              role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}">
+            <span class="alert__label">
+              {% if message.tags == 'error' %}Problem:{% elif message.tags == 'success' %}Done:{% else %}Note:{% endif %}
+            </span>
+            <span>{{ message }}</span>
+          </li>
         {% endfor %}
       </ul>
     {% endif %}
 
     {% block content %}{% endblock %}
   </main>
+
+  <footer class="site-footer">
+    <p>iSgela &middot; keeping teachers, learners, and parents in one loop.</p>
+  </footer>
+
+  <script src="{% static 'js/isgela.js' %}" defer></script>
 </body>
 </html>

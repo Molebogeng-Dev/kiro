@@ -14,14 +14,67 @@ Sprint 3 gives the AI marking engine built in Sprint 2 its first real front door
 
 ## What was built
 
-- **Memorandum authoring UI** — teacher-facing form to create and list memorandums (question, expected answer, marks available per question), replacing the Sprint 2 admin-only entry
+- **Memorandum authoring UI** — teacher-facing form to create and list memorandums (question, expected answer, marks available per question), replacing the Sprint 2 admin-only entry. A teacher can type it in, or photograph a memorandum they already have on paper and let the vision model transcribe it into the form to review before saving
 - **Mark a paper (teacher-facing)** — teacher uploads a paper photo, selects a memorandum, selects the student from a searchable dropdown, and submits to the Sprint 2 engine; the structured result (score + per-question feedback) displays on screen
-- **Graceful failure state** — a `failed` marking status shows a clear "marking failed, try again" message in the UI, not a blankpage or stack trace
+- **Graceful failure state** — a `failed` marking status shows a clear, plain-language message in the UI, not a blank page or a stack trace, plus a one-press retry that re-marks the stored photo (withheld for failures a retry cannot fix, such as an empty account)
 - **Marking history** — a list view of papers this teacher has marked, with status and score, most recent first
-- **`Assignment` model + posting UI** — title, instructions, linked memorandum, optional due date, created by the teacher; visible to all students for now (no class scoping — see known limitations)
+- **`Assignment` model + posting UI** — title, instructions, linked memorandum, optional due date, created by the teacher; the instructions can be typed or transcribed from a photo, same as memorandums; visible to all students for now (no class scoping — see known limitations)
 - **`StudyMaterial` model + posting UI** — title, plain-text content, created by the teacher; same scope simplification as assignments
-- **Access control** — all views reject non-teacher roles at the view level, consistent with Sprint 1's pattern
-- **Tests** — unauthorized role rejection, the marking flow (AI call mocked, no real API quota spent in tests), and persistence of assignments and study materials
+- **Access control** — all views reject non-teacher roles at the view level, consistent with Sprint 1's pattern, and every list is scoped to the teacher who owns the records
+- **Tests** — unauthorized role rejection, the marking flow and the transcription flow (AI calls mocked, no real API quota spent in tests), and persistence of assignments and study materials
+
+## Implementation notes
+
+Decisions worth having on record for later sprints and demo prep.
+
+- **A separate `classroom` app.** Assignments and study materials live in
+  `classroom/`, not `marking/`. They are not marking — a study material has no
+  memorandum at all — and Sprint 4 reads both from the student side. Folding
+  them into `marking` would have made that app about two unrelated things.
+
+- **`Paper` gained a `student` field.** A `Paper` now records the learner whose
+  work it is, separately from `submitted_by` (who uploaded it). A teacher marking
+  a class set is not the author of any of it, and a mark that is not attached to
+  a learner cannot reach them or their parent in Sprint 6. The field is nullable
+  so Sprint 2's JSON endpoint still works; the teacher form requires it, and a
+  learner submitting their own homework in Sprint 4 fills it in automatically.
+
+- **One submission path.** `marking/submissions.py` is the single route from an
+  uploaded file to a marked paper (validate → compress → store → mark). Both the
+  teacher page and Sprint 2's JSON endpoint go through it, so the two cannot
+  drift apart.
+
+- **Retry button and list views, beyond the brief.** The failure page offers a
+  retry that re-marks the already-stored photo, so a teacher does not have to
+  find and re-photograph the paper; it is withheld for failures a retry cannot
+  fix (empty account, withdrawn model). Assignments and study materials each got
+  a list view, because a teacher who posts something with no confirmation it
+  saved will reasonably post it again.
+
+- **Ownership is the access boundary.** With no class/roster structure, every
+  list and detail view is scoped to the teacher who created the record, and
+  memorandums are scoped per-teacher everywhere (the mark and assignment
+  dropdowns, and the "you need a memorandum first" prompts). Another teacher
+  opening your paper gets a 404. Stricter than the brief asked, and easy to
+  relax when rosters arrive.
+
+- **Photograph-to-transcribe for memorandums and assignments.** A teacher can
+  upload a photo instead of typing. It reuses the Sprint 2 image pipeline and the
+  same vision model, but asks for plain text rather than JSON, and — unlike
+  marking — the result is never saved on its own. It pre-fills the form for the
+  teacher to review and edit first, because OCR misreads and a silently altered
+  marking guide is worse than one typed by hand. The source photo is not stored;
+  it is only a means of getting text. If the model is unreachable or rate
+  limited, the teacher sees a plain message and the typing fields are still
+  right there. Lives in `marking/transcription.py`.
+
+- **The interface.** A single stylesheet (`static/css/isgela.css`), no framework
+  and no web-font download, aimed at a teacher who may be in their sixties: 18px
+  base text, 48px minimum tap targets, status carried by words as well as
+  colour, visible keyboard focus, and reduced-motion honoured. The small
+  `static/js/isgela.js` is optional progressive enhancement (type-to-filter the
+  learner list, confirm the chosen photo, show progress while marking runs);
+  every page works with it blocked.
 
 ## Setup additions this sprint
 
