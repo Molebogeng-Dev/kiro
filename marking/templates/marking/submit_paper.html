@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Mark a paper &middot; iSgela{% endblock %}
+
+{% block content %}
+  <h1>Mark a paper</h1>
+  <p>
+    Sprint 2 test harness for the marking engine. Pick a memorandum, attach a photo
+    of a paper, and the response is the raw marking JSON. The teacher and student
+    versions of this flow arrive in Sprints 3 and 4.
+  </p>
+  <p>Currently marking with <code>{{ model }}</code>.</p>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ form.as_p }}
+    <button type="submit">Mark it</button>
+  </form>
+
+  <p>
+    Marking runs while you wait and can take up to a minute, since the image is
+    sent to the vision model and read question by question.
+  </p>
+{% endblock %}

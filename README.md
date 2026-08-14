@@ -30,13 +30,29 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
 - **Three connected portals** — teacher, student, and parent each see what matters to them, in one place
 - **Parent notifications** — plain-language summaries sent automatically when homework/exam is marked
 
+## Known limitations
+
+- **Parent-student linking is currently self-declared and unverified.**
+  A parent can link themselves to a student's account by entering that student's username at registration. There is no confirmation step from the student or a teacher. For an MVP this keeps onboarding simple, but in a production version this link should requireapproval — e.g. a "pending" state confirmed by the student or a teacher — before a parent can view a child's academic records, attendance, or homework results.
+  This is a deliberate scope decision for the hackathon timeline, not an oversight.
+
+- **Static files are served by the application process.**
+  WhiteNoise sits in the middleware so the Django admin renders styled from a
+  single container, which matters while memorandum authoring is admin-only. For
+  anything beyond a demo this belongs behind a reverse proxy or CDN rather than
+  in the Python process. Revisit during the security and hardening pass, along
+  with `manage.py check --deploy`, HSTS, and secure cookie settings.
+
 ## Tech stack
 
 - Django + Django REST Framework
 - Supabase (Postgres, storage)
-- Claude API (vision-based marking)
+- Qwen2.5-VL (open-weight vision model, via OpenRouter) — paper marking engine
 - face-api.js (attendance check-in)
 - Twilio WhatsApp sandbox (parent notifications)
+
+We chose an open-weight model over a closed commercial API for the marking engine specifically because the schools this app targets often can't absorb per-token API costs at scale. 
+Qwen2.5-VL is Apache 2.0 licensed and strong at OCR/document understanding, and because it's open-weight, a production deployment could eventually be self-hosted on subsidized infrastructure — keeping the per-student marking cost near zero long-term, instead of the app being permanently dependent on a commercial API bill that grows with every school that adopts it.
 
 ## Setup
 
@@ -48,6 +64,7 @@ pip install -r requirements.txt
 # create .env (see below), then:
 python manage.py migrate
 **python manage.py createsuperuser**   # prompts for email and role (might disable permission)
+python manage.py ensure_storage_bucket # creates the private Supabase bucket for papers
 python manage.py runserver
 ```
 
@@ -67,6 +84,21 @@ lands on its own dashboard.
 | `TIME_ZONE` | no | Defaults to `Africa/Johannesburg`. |
 | `DB_CONN_MAX_AGE` | no | Seconds to reuse a connection. Defaults to `0`. |
 | `TEST_ON_POSTGRES` | no | See Tests below. |
+| `OPENROUTER_API_KEY` | yes | From openrouter.ai. Required for marking. |
+| `OPENROUTER_MODEL` | no | Vision model slug. Defaults to `qwen/qwen2.5-vl-72b-instruct`. |
+| `OPENROUTER_FALLBACK_MODELS` | no | Comma-separated slugs tried if the primary is rate-limited or withdrawn. Empty by default. |
+| `OPENROUTER_TIMEOUT` | no | Seconds. Defaults to `120`. |
+| `OPENROUTER_MAX_TOKENS` | no | Defaults to `2000`. |
+| `SUPABASE_SERVICE_KEY` | yes | `service_role` key, from Supabase → Project Settings → API. Needed to upload papers. |
+| `SUPABASE_URL` | no | Derived from `DATABASE_URL`'s project reference. Only set it to override. |
+| `SUPABASE_STORAGE_BUCKET` | no | Defaults to `papers`. |
+| `SUPABASE_SIGNED_URL_EXPIRY` | no | Seconds a paper's signed URL stays valid. Defaults to `3600`. |
+| `MARKING_IMAGE_MAX_DIMENSION` | no | Longest edge after compression. Defaults to `1600`. |
+| `MARKING_IMAGE_JPEG_QUALITY` | no | Defaults to `80`. |
+| `MARKING_MAX_UPLOAD_BYTES` | no | Rejected above this before processing. Defaults to 15 MB. |
+
+The `service_role` key bypasses row-level security. It stays server-side, is
+never rendered into a template, and belongs in `.env` only.
 
 ### A note on the Supabase connection string
 
@@ -78,9 +110,82 @@ reads like a credentials problem but is not one.
 Two things to watch for when pasting it in:
 
 - Replace the whole `[YOUR-PASSWORD]` placeholder, brackets included.
-- If your password contains `@`, `#`, `/`, or `?`, percent-encode it
-  (`@` becomes `%40`). The parser in `config/db.py` tolerates both of these
-  mistakes, but other Postgres tools will not.
+- Percent-encoding the password is still the safest thing to do (`@` becomes
+  `%40`, `?` becomes `%3F`). The parser in `config/db.py` tolerates any one of
+  `@`, `#`, `/`, `?`, or `:` left raw, but a password containing both a raw `@`
+  and a raw `?` is genuinely ambiguous and is rejected with an explanatory
+  error. Other Postgres tools, `psql` included, are stricter than this parser.
+
+Query parameters on the URL are passed straight through to libpq, so
+`?sslmode=verify-full&application_name=isgela` works as expected. The parser is
+covered by `config/tests.py`.
+
+## The marking engine
+
+`marking/` holds the Scan & Mark engine, built independently of any portal so the
+teacher flow (Sprint 3) and the student homework flow (Sprint 4) can both call it.
+
+The path a submission takes:
+
+1. `core/images.py` validates the upload is genuinely a JPEG or PNG, straightens
+   it using its EXIF orientation tag, and compresses it. A 4 MB phone photo
+   typically leaves as a few hundred kilobytes, which matters when the person
+   uploading is paying for mobile data.
+2. `core/storage.py` puts the compressed image in a **private** Supabase Storage
+   bucket. Papers are children's schoolwork, so the bucket is not public and
+   `url()` returns a time-limited signed URL.
+3. `marking/openrouter.py` sends the image and the memorandum to a vision model.
+4. `marking/parsing.py` turns the reply into marks, tolerating the formatting
+   drift an open-weight model produces.
+5. `marking/engine.py` stores the result, or records why it failed.
+
+### Choosing a model
+
+The model slug is configuration, not code, because free-tier availability on
+OpenRouter changes without notice. As of this sprint:
+
+| Slug | Cost | Notes |
+| --- | --- | --- |
+| `qwen/qwen2.5-vl-72b-instruct` | ~$0.25/M input, about $0.0006 per paper | Apache 2.0, self-hostable later. Read a test paper accurately. Default. |
+| `nvidia/nemotron-nano-12b-v2-vl:free` | free | Works, returns clean JSON, but read the same paper less accurately. |
+| `google/gemma-4-31b-it:free` | free | Returned HTTP 429 on first attempt. |
+
+There is currently **no free Qwen2.5-VL variant** on OpenRouter; the `:free`
+slug has been withdrawn. `OPENROUTER_FALLBACK_MODELS` is deliberately empty by
+default: falling back mid-demo would mark different papers with different models,
+and marks are not comparable across models. Every result records the
+`model_used` that produced it.
+
+### When marking fails
+
+A failure never loses the submission. The `Paper` is kept with
+`status="failed"` and a `failure_kind`, because the response differs per kind:
+
+| Kind | Cause | HTTP |
+| --- | --- | --- |
+| `rate_limited` | Provider 429 | 429, with `retry_after` |
+| `no_credit` | Provider 402 | 402 |
+| `model_unavailable` | Slug withdrawn (404) | 503 |
+| `service_error` | Timeout or 5xx, after one retry | 502 |
+| `invalid_response` | Unparseable after one corrective retry | 422 |
+| `image_error` | Not a usable image | 400 |
+
+Marking runs synchronously and can take up to a minute. Moving it to a
+background worker is a scaling concern for after the hackathon.
+
+### Task runner
+
+`run.sh` wraps the common commands and finds the virtualenv itself:
+
+```bash
+./run.sh              # dev server (default port 1097)
+./run.sh test         # suite against in-memory SQLite
+./run.sh test-pg      # same suite against Supabase Postgres
+./run.sh check        # system checks + unapplied-migration check
+./run.sh ci           # check + test, no server. Use this in a pipeline.
+```
+
+Exit codes propagate, so `./run.sh ci` fails a build when the suite fails.
 
 ### Tests
 
@@ -88,8 +193,10 @@ Two things to watch for when pasting it in:
 python manage.py test
 ```
 
-Runs against in-memory SQLite so the suite finishes in under a second and works
-without a database connection. To run the same suite against Supabase:
+Runs against in-memory SQLite, with file storage swapped for an in-memory
+backend and every OpenRouter call mocked. The suite makes no network requests,
+burns no API quota, and leaves nothing in the storage bucket. To run the same
+suite against Supabase:
 
 ```bash
 TEST_ON_POSTGRES=True python manage.py test --keepdb
@@ -97,6 +204,61 @@ TEST_ON_POSTGRES=True python manage.py test --keepdb
 
 `--keepdb` is required: Supabase's pooler holds a session open, which stops
 Django from dropping the test database afterwards.
+
+## Continuous integration
+
+GitHub Actions, defined in `.github/workflows/ci.yml`.
+
+Only testing is switched on. Lint, security scanning, image packaging, release,
+and deploy jobs are written out in full but commented, to be enabled as the
+project needs them.
+
+| Job | What it proves | Needs secrets? |
+| --- | --- | --- |
+| Tests (in-memory SQLite) | The suite, plus `check` and a migration-drift check | No |
+| Tests (Postgres) | The same suite on a real Postgres service container | No |
+| Tests (live Supabase) | The same suite against the actual project database | Yes, and skips itself without them |
+
+The first two need **no configuration at all**. Under the test runner the
+settings module supplies its own throwaway `SECRET_KEY`, swaps in in-memory
+SQLite and in-memory file storage, and forces a fake OpenRouter key, so a test
+that forgot to mock cannot spend real quota.
+
+The Postgres job uses an ephemeral service container rather than Supabase. It
+needs no credentials, cannot collide with another pipeline running at the same
+time, and exercises the test-database teardown path that Supabase's pooler
+blocks. To also run against real Supabase, set a `SUPABASE_TEST_DATABASE_URL`
+secret; that job never fails the pipeline, since it depends on a third party
+being up.
+
+## Running from a container image
+
+For demos, in case a hosted deployment is not ready in time.
+
+```bash
+docker build -t isgela:latest .
+
+docker run --rm -p 8000:8000 \
+  --env-file .env \
+  --env ALLOWED_HOSTS=localhost,127.0.0.1 \
+  --env RUN_MIGRATIONS_ON_START=1 \
+  --env ENSURE_STORAGE_BUCKET_ON_START=1 \
+  isgela:latest
+```
+
+Notes on the image:
+
+- Two stages, so pip and its caches never reach the runtime layer. Runs as a
+  non-root user.
+- `.env` is in `.dockerignore`: configuration is passed in at run time, never
+  baked into a layer.
+- Migrations and bucket creation are **opt-in** via the two flags above. They are
+  off by default because more than one replica starting at once would race to
+  apply the same migration. For a single demo container, switch them on.
+- Gunicorn runs with `--timeout 180`. Marking is synchronous and a paper can take
+  up to a minute, which the 30 second default would kill.
+- WhiteNoise serves collected static files, so the Django admin renders styled.
+  That is not cosmetic while memorandum authoring is admin-only.
 
 ## Built with Kiro
 

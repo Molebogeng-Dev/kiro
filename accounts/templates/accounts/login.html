@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Log in &middot; iSgela{% endblock %}
+
+{% block content %}
+  <h1>Log in to iSgela</h1>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ form.as_p }}
+    <button type="submit">Log in</button>
+  </form>
+
+  <p>No account yet? <a href="{% url 'accounts:register' %}">Register</a>.</p>
+{% endblock %}

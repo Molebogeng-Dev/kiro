@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Not available &middot; iSgela{% endblock %}
+
+{% block content %}
+  <h1>This page is not available for your account</h1>
+  <p>{% if exception %}{{ exception }}{% else %}You do not have access to this page.{% endif %}</p>
+  <p><a href="{% url 'core:home' %}">Go to your dashboard</a></p>
+{% endblock %}

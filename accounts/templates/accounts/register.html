@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Register &middot; iSgela{% endblock %}
+
+{% block content %}
+  <h1>Create your iSgela account</h1>
+  <p>Choose the role that describes you. It decides what you see after logging in.</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ form.as_p }}
+    <button type="submit">Create account</button>
+  </form>
+
+  <p>Already registered? <a href="{% url 'accounts:login' %}">Log in</a>.</p>
+{% endblock %}

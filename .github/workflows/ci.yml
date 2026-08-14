@@ -1,0 +1,290 @@
+# iSgela CI (GitHub Actions)
+#
+# Only testing is switched on. The lint, security, package, release, and deploy
+# jobs are written out in full but commented, so enabling one is a matter of
+# deleting the comment markers rather than working out what it should have said.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: nothing here needs write access to the repository.
+permissions:
+  contents: read
+
+# A new push to the same branch cancels the run already in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  # ------------------------------------------------------------------------- #
+  # test
+  # ------------------------------------------------------------------------- #
+
+  # The fast, hermetic run. No database server, no network, no credentials: the
+  # settings module swaps in in-memory SQLite, in-memory file storage, and a
+  # fake OpenRouter key whenever the test runner is what is executing.
+  test-sqlite:
+    name: Tests (in-memory SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Django checks
+        run: python manage.py check
+
+      - name: Migrations are in sync with the models
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run the suite
+        run: python manage.py test --verbosity 2
+
+  # The same suite against a real Postgres, so anything SQLite cannot catch is
+  # still covered. An ephemeral service container rather than Supabase: no
+  # credentials, no interference between concurrent runs, and it exercises the
+  # database teardown path that Supabase's pooler blocks.
+  test-postgres:
+    name: Tests (Postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: isgela_ci
+          POSTGRES_USER: isgela
+          # An ephemeral service container on the runner. Not a secret.
+          POSTGRES_PASSWORD: isgela
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U isgela -d isgela_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_ON_POSTGRES: "True"
+      # sslmode=disable because the parser defaults to `require` for Supabase,
+      # and a throwaway service container has no TLS.
+      DATABASE_URL: postgresql://isgela:isgela@localhost:5432/isgela_ci?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run the suite against Postgres
+        run: python manage.py test --verbosity 2
+
+  # The same suite against the real Supabase instance.
+  #
+  # Skips itself unless the SUPABASE_TEST_DATABASE_URL secret is set, and never
+  # fails the workflow, because it depends on a third party being up and on
+  # free-tier quota. --keepdb is required: Supabase's pooler holds a session
+  # open, which stops Django from dropping the test database afterwards.
+  test-supabase:
+    name: Tests (live Supabase, optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    env:
+      TEST_ON_POSTGRES: "True"
+      DATABASE_URL: ${{ secrets.SUPABASE_TEST_DATABASE_URL }}
+
+    steps:
+      - name: Skip if no Supabase credentials are configured
+        if: env.DATABASE_URL == ''
+        run: echo "SUPABASE_TEST_DATABASE_URL is not set; skipping this job."
+
+      - uses: actions/checkout@v5
+        if: env.DATABASE_URL != ''
+
+      - uses: actions/setup-python@v6
+        if: env.DATABASE_URL != ''
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        if: env.DATABASE_URL != ''
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run the suite against Supabase
+        if: env.DATABASE_URL != ''
+        run: python manage.py test --keepdb --verbosity 2
+
+  # ------------------------------------------------------------------------- #
+  # lint
+  # ------------------------------------------------------------------------- #
+
+  # lint:
+  #   name: Lint
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: actions/setup-python@v6
+  #       with:
+  #         python-version: "3.12"
+  #     - run: pip install ruff==0.14.0 djlint==1.36.4
+  #     - run: ruff check .
+  #     - run: ruff format --check .
+  #     - run: djlint . --check
+
+  # ------------------------------------------------------------------------- #
+  # security
+  # ------------------------------------------------------------------------- #
+
+  # security:
+  #   name: Security
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: actions/setup-python@v6
+  #       with:
+  #         python-version: "3.12"
+  #     - run: pip install -r requirements.txt pip-audit==2.9.0 bandit==1.8.6
+  #     # Known vulnerabilities in pinned dependencies.
+  #     - run: pip-audit --requirement requirements.txt --strict
+  #     - run: bandit --recursive accounts core marking config --skip B101
+  #     # Django's own production-settings audit: HSTS, secure cookies, DEBUG.
+  #     - run: python manage.py check --deploy --fail-level WARNING
+  #       env:
+  #         SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  #         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # secret-scan:
+  #   name: Secret scan
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: gitleaks/gitleaks-action@v2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ------------------------------------------------------------------------- #
+  # package
+  # ------------------------------------------------------------------------- #
+
+  # package:
+  #   name: Build and publish image
+  #   runs-on: ubuntu-latest
+  #   needs: [test-sqlite, test-postgres]
+  #   if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: docker/setup-buildx-action@v3
+  #     - uses: docker/login-action@v3
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #     - id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ghcr.io/${{ github.repository }}
+  #     - uses: docker/build-push-action@v6
+  #       with:
+  #         context: .
+  #         push: true
+  #         tags: ${{ steps.meta.outputs.tags }}
+  #         labels: ${{ steps.meta.outputs.labels }}
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  #     # Prove the published image actually starts.
+  #     - name: Smoke test the image
+  #       run: |
+  #         docker run --rm --detach --name isgela-smoke \
+  #           --env SECRET_KEY=smoke-test-only \
+  #           --env "DATABASE_URL=postgresql://u:p@localhost:5432/db?sslmode=disable" \
+  #           --publish 8000:8000 ghcr.io/${{ github.repository }}:main
+  #         sleep 8
+  #         docker exec isgela-smoke python -c \
+  #           "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5)"
+  #         docker stop isgela-smoke
+
+  # ------------------------------------------------------------------------- #
+  # release
+  # ------------------------------------------------------------------------- #
+
+  # release:
+  #   name: Release
+  #   runs-on: ubuntu-latest
+  #   needs: [package]
+  #   if: startsWith(github.ref, 'refs/tags/')
+  #   permissions:
+  #     contents: write
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: softprops/action-gh-release@v2
+  #       with:
+  #         generate_release_notes: true
+
+  # ------------------------------------------------------------------------- #
+  # deploy
+  # ------------------------------------------------------------------------- #
+
+  # deploy-demo:
+  #   name: Deploy (demo)
+  #   runs-on: ubuntu-latest
+  #   needs: [package]
+  #   if: github.ref == 'refs/heads/main'
+  #   environment:
+  #     name: demo
+  #     url: https://demo.isgela.example
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: actions/setup-python@v6
+  #       with:
+  #         python-version: "3.12"
+  #     - run: pip install -r requirements.txt
+  #     # Migrations run as a deploy step rather than on container start, so that
+  #     # more than one replica cannot run them concurrently.
+  #     - run: python manage.py migrate --noinput
+  #       env:
+  #         SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  #         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  #     - run: python manage.py ensure_storage_bucket
+  #       env:
+  #         SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  #         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  #         SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

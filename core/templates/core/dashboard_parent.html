@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Parent dashboard &middot; iSgela{% endblock %}
+
+{% block content %}
+  <h1>Welcome, Parent</h1>
+  <p>This is a placeholder. Your child's marked work, attendance, and notifications land in later sprints.</p>
+
+  {% with children=user.children %}
+    {% if children %}
+      <h2>Linked learners</h2>
+      <ul>
+        {% for child in children %}
+          <li>{{ child.get_full_name|default:child.username }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No learner is linked to your account yet. An administrator can link one for you.</p>
+    {% endif %}
+  {% endwith %}
+{% endblock %}
