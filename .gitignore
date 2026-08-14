@@ -20,6 +20,8 @@ env/
 # Django
 db.sqlite3
 db.sqlite3-journal
+# Stray local artefact, kept on disk but not worth versioning.
+db.sqlite#
 staticfiles/
 media/
 *.log

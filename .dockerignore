@@ -1,0 +1,39 @@
+# Secrets must never be baked into an image layer.
+.env
+.env.*
+
+# Local virtualenvs: the image builds its own.
+venv/
+.venv/
+env/
+
+# Version control and CI
+.git/
+.gitignore
+.github/
+
+# Python noise
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local databases and build output
+db.sqlite3
+db.sqlite3-journal
+db.sqlite#
+staticfiles/
+media/
+*.log
+
+# Editor and OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Kiro workspace state
+.kiro/
+
+# Not needed at runtime
+Dockerfile
+.dockerignore
