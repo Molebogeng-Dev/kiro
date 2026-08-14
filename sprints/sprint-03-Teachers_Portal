@@ -1,0 +1,62 @@
+# Sprint 3 — Teacher Portal
+
+## Overview
+
+Sprint 3 gives the AI marking engine built in Sprint 2 its first real front door: a teacher-facing portal. Nothing here duplicates marking logic — every feature calls the existing `Paper`, `Memorandum`, and `MarkingResult` models and the OpenRouter/Qwen2.5-VL call from Sprint 2.
+
+## Goals
+
+- Let a teacher author memorandums through a real UI, not just admin
+- Let a teacher upload and mark a paper for a specific student, and see the structured result
+- Give teachers a history view of what they've marked
+- Let a teacher create assignments and study materials, ready for students to see in Sprint 4
+- Keep the MVP's data model simple: no class/roster structure yet
+
+## What was built
+
+- **Memorandum authoring UI** — teacher-facing form to create and list memorandums (question, expected answer, marks available per question), replacing the Sprint 2 admin-only entry
+- **Mark a paper (teacher-facing)** — teacher uploads a paper photo, selects a memorandum, selects the student from a searchable dropdown, and submits to the Sprint 2 engine; the structured result (score + per-question feedback) displays on screen
+- **Graceful failure state** — a `failed` marking status shows a clear "marking failed, try again" message in the UI, not a blankpage or stack trace
+- **Marking history** — a list view of papers this teacher has marked, with status and score, most recent first
+- **`Assignment` model + posting UI** — title, instructions, linked memorandum, optional due date, created by the teacher; visible to all students for now (no class scoping — see known limitations)
+- **`StudyMaterial` model + posting UI** — title, plain-text content, created by the teacher; same scope simplification as assignments
+- **Access control** — all views reject non-teacher roles at the view level, consistent with Sprint 1's pattern
+- **Tests** — unauthorized role rejection, the marking flow (AI call mocked, no real API quota spent in tests), and persistence of assignments and study materials
+
+## Setup additions this sprint
+
+No new environment variables or dependencies — this sprint builds UI and models on top of Sprint 2's existing engine and credentials.
+
+Before running this sprint: confirm a spend cap is set on the OpenRouter account, since this sprint puts the marking engine behind a UI that will be clicked repeatedly by testers and, eventually, judges.
+
+## Definition of done
+
+- [x] Teacher can create a memorandum through the UI
+- [x] Teacher can upload and mark a paper for a specific student and see the structured result on screen
+- [x] A failed marking attempt shows a clear error state, not a crash
+- [x] Teacher can view their marking history
+- [x] Teacher can create an assignment linked to a memorandum
+- [x] Teacher can create a study material item
+- [x] All views reject non-teacher roles at the view level
+- [x] Tests cover unauthorized access, the mocked marking flow, and assignment/study material persistence
+
+## Out of scope for this sprint
+
+Student-facing display of assignments or study materials (Sprint 4), facial recognition attendance (Sprint 5), parent notifications (Sprint 6), the cross-subject progress dashboard (Sprint 7).
+
+## Known limitations
+
+- **No class/roster structure yet.** Teachers select a student from a
+  full list when marking a paper or creating an assignment, rather
+  than from their own class roster. Assignments and study materials
+  are visible to all students rather than scoped to a specific class.
+  This keeps the MVP's data model simple within the hackathon
+  timeline; a production version would add a `School`/`Class`
+  structure so teachers only see and interact with their own
+  students. This is a deliberate scope decision, not an oversight.
+- **Parent-student linking is still self-declared and unverified**
+  (carried over from Sprint 1) — unchanged by this sprint.
+
+## Next up — Sprint 4
+
+Build the student portal: view study materials and assignments, and submit homework via camera scan, which calls the same Sprint 2 marking engine used here.

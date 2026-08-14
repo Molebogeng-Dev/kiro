@@ -47,12 +47,15 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
 
 - Django + Django REST Framework
 - Supabase (Postgres, storage)
-- Qwen2.5-VL (open-weight vision model, via OpenRouter) — paper marking engine
-- face-api.js (attendance check-in)
-- Twilio WhatsApp sandbox (parent notifications)
+- Qwen2.5-VL-72B-Instruct (open-weight vision model, via OpenRouter) — paper marking engine
+- face-api.js — attendance check-in
+- Twilio WhatsApp sandbox — parent notifications
 
-We chose an open-weight model over a closed commercial API for the marking engine specifically because the schools this app targets often can't absorb per-token API costs at scale. 
-Qwen2.5-VL is Apache 2.0 licensed and strong at OCR/document understanding, and because it's open-weight, a production deployment could eventually be self-hosted on subsidized infrastructure — keeping the per-student marking cost near zero long-term, instead of the app being permanently dependent on a commercial API bill that grows with every school that adopts it.
+We chose an **open-weight model over a closed commercial API** for the marking engine because the schools this app targets can't absorb unpredictable per-token costs at scale. Qwen2.5-VL is Apache 2.0 licensed and strong at OCR/document understanding.
+
+In practice, marking a single paper costs well under $0.001 at current OpenRouter pricing ($0.25/M input tokens, $0.75/M output tokens) — a school marking 10,000 papers a month lands around $10/month in total. That cost is designed to sit with the operator (a school or the department), not the individual parent or student, so no one at the household level ever needs to pay per use.
+
+Because the model is open-weight, there's also a clear path beyond that: a production deployment could self-host Qwen2.5-VL on subsidized infrastructure, bringing the marginal cost per student toward zero at national scale, rather than the app being permanently dependent on a commercial API bill that grows with every school that adopts it.
 
 ## Setup
 
