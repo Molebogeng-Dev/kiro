@@ -215,14 +215,26 @@ project needs them.
 
 | Job | What it proves | Needs secrets? |
 | --- | --- | --- |
-| Tests (in-memory SQLite) | The suite, plus `check` and a migration-drift check | No |
-| Tests (Postgres) | The same suite on a real Postgres service container | No |
+| Tests (in-memory SQLite) | `manage.py check`, then the suite | No |
+| Tests (Postgres) | Migration drift, then the same suite on a real Postgres | No |
 | Tests (live Supabase) | The same suite against the actual project database | Yes, and skips itself without them |
 
-The first two need **no configuration at all**. Under the test runner the
-settings module supplies its own throwaway `SECRET_KEY`, swaps in in-memory
-SQLite and in-memory file storage, and forces a fake OpenRouter key, so a test
-that forgot to mock cannot spend real quota.
+The first two need **no secrets**. Under the test runner the settings module
+supplies its own throwaway `SECRET_KEY`, swaps in in-memory SQLite and in-memory
+file storage, and forces a fake OpenRouter key, so a test that forgot to mock
+cannot spend real quota.
+
+They are not entirely configuration-free, though. `check` and `makemigrations`
+are not tests: they import the real settings module, which refuses to start
+without a `SECRET_KEY` and a `DATABASE_URL`. That refusal is deliberate, so the
+workflow supplies a throwaway key and, for the SQLite job, a `DATABASE_URL`
+pointing at a closed port that nothing connects to. The alternative would be
+loosening the settings module so a missing key is tolerated outside tests, which
+is exactly the mistake the check is there to catch.
+
+`makemigrations --check` runs in the Postgres job rather than the SQLite one
+because it consults the database for migration history: against a real database
+it is silent and meaningful, against a placeholder it warns and proves little.
 
 The Postgres job uses an ephemeral service container rather than Supabase. It
 needs no credentials, cannot collide with another pipeline running at the same
