@@ -2,88 +2,53 @@
 
 ## Overview
 
-Sprint 4 gives students their front door: viewing what teachers have
-posted, and submitting homework through the same marking engine
-teachers use. No marking logic is duplicated — homework submission
-reuses Sprint 3's `submissions.py` path directly, same pipeline as
-teacher-side marking.
+Sprint 4 gives students their front door: viewing what teachers have posted, and submitting homework through the same marking engine teachers use. No marking logic is duplicated — homework submission reuses Sprint 3's `submissions.py` path directly, same pipeline as teacher-side marking.
 
 ## Goals
 
 - Let a student view study materials and assignments
-- Let a student submit homework for an assignment and see the marked
-  result, using the existing engine
-- Guarantee a student can never submit homework attributed to another
-  student, even by a tampered request
+- Let a student submit homework for an assignment and see the marked result, using the existing engine
+- Guarantee a student can never submit homework attributed to another student, even by a tampered request
 - Let a student view their own marked results, and only their own
-- Carry forward Sprint 3's interface and access-control standards
-  rather than establishing new ones
+- Carry forward Sprint 3's interface and access-control standards rather than establishing new ones
 
 ## What was built
 
-- **Study materials view** — list and detail view of `StudyMaterial`
-  items, visible to all students for now (no class scoping yet — same
-  known limitation carried from Sprint 3)
-- **Assignments view** — list view of `Assignment` items (title,
-  instructions, due date), each showing whether the logged-in student
-  has already submitted homework for it
-- **`Paper.assignment`** — new nullable FK linking a submission back
-  to the assignment it answers, distinct from its memorandum
-- **Homework submission** — student selects an assignment, uploads a
-  photo, submits through Sprint 3's existing marking pipeline: same
-  compression, same AI call, same defensive parsing
-- **Server-set student ownership** — `Paper.student` is set from
-  `request.user` server-side, never from any client-supplied field.
-  Covered by an explicit test that attempts to submit with a spoofed
-  student ID and confirms it's rejected/ignored.
-- **Graceful failure state** — reuses Sprint 3's clear retry pattern
-  on a failed marking attempt, no crash, no duplicated UI logic
-- **Own results view** — a student can see their own marked papers
-  (score, per-question feedback, most recent first); the same
-  ownership boundary from Sprint 3 prevents viewing another student's
-  results, enforced at the view level
-- **Access control** — all views reject non-student roles, consistent
-  with Sprints 1 and 3
-- **Tests** — role rejection, the student-spoofing attempt, the
-  mocked marking flow, and assignment-submission-status display
+- **Study materials view** — list and detail view of `StudyMaterial` items, visible to all students for now (no class scoping yet — same known limitation carried from Sprint 3)
+- **Assignments view** — list view of `Assignment` items (title, instructions, due date), each showing whether the logged-in student has already submitted homework for it
+- **`Paper.assignment`** — new nullable FK linking a submission back to the assignment it answers, distinct from its memorandum
+- **Homework submission** — student selects an assignment, uploads a photo, submits through Sprint 3's existing marking pipeline: same compression, same AI call, same defensive parsing
+- **Server-set student ownership** — `Paper.student` is set from `request.user` server-side, never from any client-supplied field. Covered by an explicit test that attempts to submit with a spoofed student ID and confirms it's rejected/ignored.
+- **Graceful failure state** — reuses Sprint 3's clear retry pattern on a failed marking attempt, no crash, no duplicated UI logic
+- **Own results view** — a student can see their own marked papers (score, per-question feedback, most recent first); the same ownership boundary from Sprint 3 prevents viewing another student's results, enforced at the view level
+- **Access control** — all views reject non-student roles, consistent with Sprints 1 and 3
+- **Tests** — role rejection, the student-spoofing attempt, the mocked marking flow, and assignment-submission-status display
 
 ## Definition of done
 
 - [x] Student can view study materials and assignments
-- [x] Student can submit homework for an assignment and see the
-      marked result
-- [x] `Paper.student` is proven server-set, not client-controlled —
-      covered by an explicit spoofing test
-- [x] A failed marking attempt shows the same clear retry state as
-      the teacher flow
-- [x] Student can view their own results, and cannot access another
-      student's results by URL-guessing
+- [x] Student can submit homework for an assignment and see the marked result
+- [x] `Paper.student` is proven server-set, not client-controlled — covered by an explicit spoofing test
+- [x] A failed marking attempt shows the same clear retry state as the teacher flow
+- [x] Student can view their own results, and cannot access another student's results by URL-guessing
 - [x] All views reject non-student roles at the view level
-- [x] Tests cover role rejection, the spoofing attempt, the mocked
-      marking flow, and submission-status display
+- [x] Tests cover role rejection, the spoofing attempt, the mocked marking flow, and submission-status display
 
 ## Interface standards carried forward
 
-18px body text, 48px minimum tap targets, AA contrast, visible focus,
-works without JavaScript — the bar Sprint 3 established, not a
-one-off for that sprint alone.
+18px body text, 48px minimum tap targets, AA contrast, visible focus, works without JavaScript — the bar Sprint 3 established, not a one-off for that sprint alone.
 
 ## Out of scope for this sprint
 
-Teacher visibility into homework results (Sprint 7's dashboard),
-facial recognition attendance (Sprint 5), parent notifications
-(Sprint 6), photo-to-transcribe (a teacher-authoring feature from
-Sprint 3, not relevant to students).
+Teacher visibility into homework results (Sprint 7's dashboard), facial recognition attendance (Sprint 5), parent notifications (Sprint 6), photo-to-transcribe (a teacher-authoring feature from Sprint 3, not relevant to students).
 
 ## Known limitations
 
-- **No class/roster structure yet** (carried over from Sprint 3) —
-  study materials and assignments are visible to all students, not
-  scoped to a class.
+- **No class/roster structure yet** (carried over from Sprint 3) — study materials and assignments are visible to all students, not scoped to a class.
+
 - **Parent-student linking is still self-declared and unverified**
   (carried over from Sprint 1) — unchanged by this sprint.
 
 ## Next up — Sprint 5
 
-Build facial recognition attendance: a teacher-triggered single scan
-per student, once at morning arrival and once at afternoon departure.
+Build facial recognition attendance: a teacher-triggered single scan per student, once at morning arrival and once at afternoon departure.
