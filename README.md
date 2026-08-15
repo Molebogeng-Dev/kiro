@@ -74,6 +74,36 @@ python manage.py runserver
 Then visit `/accounts/register/`, create one account per role, and confirm each
 lands on its own dashboard.
 
+## Deployment note — timeout configuration required
+
+Marking is a synchronous call and can take up to a few minutes under
+load. The application layer is already configured for a 3-minute
+timeout, but **this alone is not enough** — whichever platform this
+gets deployed to must be explicitly checked and configured to match,
+or a shorter platform-level timeout will kill the request regardless
+of the application setting.
+
+Before deploying, confirm and align timeouts at every layer in the
+request path:
+
+- [ ] **Application/WSGI server** (e.g. gunicorn `--timeout`) — already
+      set to 3 minutes, verify it's still in place
+- [ ] **Reverse proxy**, if one is used (e.g. Nginx
+      `proxy_read_timeout` / `proxy_send_timeout`) — defaults are
+      often as low as 60s and will silently override a longer
+      application-level setting
+- [ ] **Load balancer**, if one is used (e.g. AWS ALB idle timeout,
+      default 60s) — must be raised to match
+- [ ] **Platform-imposed hard limits** — some hosting platforms cap
+      request duration regardless of any config (e.g. Heroku's router
+      enforces a fixed 30-second limit that cannot be overridden).
+      Confirm the chosen platform actually supports multi-minute
+      requests before deploying, not after.
+
+If a mismatch is discovered late, the marking flow will appear to
+work in local testing but fail intermittently in production —
+exactly the kind of bug that's easy to miss until a demo.
+
 ### Environment variables
 
 `.env` in the project root, never committed:
