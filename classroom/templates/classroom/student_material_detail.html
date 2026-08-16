@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}{{ material.title }} &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ material.title }}</h1>
+    <p class="page-head__lead">
+      about {{ material.reading_time_minutes }} minute{{ material.reading_time_minutes|pluralize }} to read
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="prose">{{ material.content }}</div>
+  </div>
+
+  <p style="margin-top:1.5rem">
+    <a href="{% url 'classroom:student_material_list' %}">&larr; Back to study material</a>
+  </p>
+{% endblock %}

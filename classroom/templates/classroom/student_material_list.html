@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Study material &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Study material</h1>
+    <p class="page-head__lead">Notes and explanations your teachers have shared.</p>
+  </div>
+
+  {% if materials %}
+    <ul class="record-list">
+      {% for material in materials %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ material.title }}</p>
+            <p class="record__meta">
+              about {{ material.reading_time_minutes }} minute{{ material.reading_time_minutes|pluralize }} to read
+            </p>
+          </div>
+          <div class="record__aside">
+            <a class="button button--secondary" href="{% url 'classroom:student_material_detail' material.pk %}">Read</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">Nothing to read yet</h3>
+      <p class="empty__body">
+        When a teacher posts notes or an explanation, it appears here for you to
+        open any time.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Submit homework &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Submit homework</h1>
+    <p class="page-head__lead">{{ assignment.title }}</p>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <h2 class="card__title">What to do</h2>
+    <p class="prose">{{ assignment.instructions }}</p>
+    {% if assignment.due_date %}
+      <p class="muted small">
+        {% if assignment.is_past_due %}Was due{% else %}Due{% endif %}
+        {{ assignment.due_date|date:"j F Y" }}.
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <form method="post" enctype="multipart/form-data" class="form" data-busy novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <ul class="form__errors" role="alert">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.image %}
+
+      <div class="form__actions">
+        <button type="submit" class="button button--block" data-busy-button
+                data-busy-label="Marking your work, please wait…">
+          Submit for marking
+        </button>
+        <p class="form__help" data-busy-note hidden>
+          Marking takes up to a minute. Please stay on this page — there is no
+          need to press the button again.
+        </p>
+        <p class="form__help">
+          Your teacher set this, so it is marked against their memorandum
+          automatically. You do not choose a marking guide.
+        </p>
+      </div>
+    </form>
+  </div>
+
+  <p style="margin-top:1.5rem">
+    <a href="{% url 'classroom:student_assignment_list' %}">&larr; Back to my assignments</a>
+  </p>
+{% endblock %}

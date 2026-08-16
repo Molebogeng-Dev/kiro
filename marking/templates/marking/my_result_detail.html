@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}My result &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{% if paper.assignment %}{{ paper.assignment.title }}{% else %}{{ paper.memorandum.title }}{% endif %}</h1>
+    <p class="page-head__lead">
+      Submitted {{ paper.created_at|date:"j F Y, H:i" }}
+    </p>
+  </div>
+
+  {% url 'marking:my_result_retry' paper.pk as retry_url %}
+  {% url 'classroom:student_assignment_list' as alt_action_url %}
+  {% url 'marking:my_results' as back_url %}
+  {% include "marking/_result_body.html" with retry_url=retry_url alt_action_url=alt_action_url alt_action_label="Back to my assignments" back_url=back_url back_label="Back to my results" %}
+{% endblock %}

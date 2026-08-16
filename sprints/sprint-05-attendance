@@ -1,0 +1,54 @@
+# Sprint 5 — Attendance (Grade-Based)
+
+## Overview
+
+Sprint 5 builds attendance, but not as a single mechanism for everyone. Facial recognition applies only to secondary students (grades 8–12). Primary students (grades 1–7) get a traditional manual roll-call register instead — deliberately avoiding a biometric, workplace-style check-in for young children, while giving secondary students something closer to a professional check-in environment as preparation for the world beyond school.
+
+## Goals
+
+- Add a `grade` field to `User` so attendance can route by grade band
+- Build a manual roll-call register for primary students (1–7)
+- Build facial-recognition check-in/check-out for secondary students (8–12), with consent and a manual fallback
+- Land both mechanisms on one shared `Attendance` model, so later sprints don't need to know which method produced a record
+- Enforce grade-based routing at the view level, not just in the UI
+
+## What was built
+
+- **`User.grade`** — integer field, 1–12, added to the existing student registration form from Sprint 1 as a required field for students. A small addition to existing auth, not new auth work.
+- **`Attendance` model** — student (FK), date, `method` (`"manual"` / `"facial"`), `arrived_at` (nullable), `departed_at` (nullable). One record per student per day, enforced at the database level. Viewable and markable by any teacher — not scoped to whoever created the record, since this is a shared front-desk function, not personal marking work.
+- **Primary flow (grades 1–7)** — a register view listing all grade 1–7 students (no class/roster structure yet, same known limitation as Sprints 3/4). Teacher ticks who's present, submits; creates `Attendance(method="manual", arrived_at=now)` per student for today. No `departed_at` tracking — a register records presence, not clock-in/clock-out. A student with no record for the day is implicitly absent.
+- **`FaceEnrollment` model (secondary only)** — student (FK), stored face descriptor (never the source photo), enrolled-by, enrolled-at, and a `consent_confirmed` boolean the enrolling teacher must explicitly check
+- **Enrollment flow** — teacher selects a secondary student, captures a reference photo via browser camera, confirms consent, saves. Re-enrolling updates the existing descriptor rather than duplicating it.
+- **Check-in/check-out flow (secondary)** — camera captures a frame, face-api.js matches against enrolled descriptors. On match: sets `arrived_at` if unset today, otherwise `departed_at`, `method="facial"`.
+- **Shared manual fallback** — a failed facial match reuses the exact same manual-marking mechanism the primary flow uses, rather than a second, duplicated manual-entry path
+- **Grade-based routing enforced server-side** — a grade 1–7 student is never offered facial enrollment; a grade 8–12 student doesn't appear in the manual roll-call list except via the fallback path. Enforced at the view level based on `User.grade`, not hidden UI.
+- **Attendance history** — a list viewable by any teacher, showing who's been marked present today across both methods, with the method that produced each record
+
+## Definition of done
+
+- [x] `User.grade` added and required at student registration
+- [x] Manual roll-call for primary students creates correct one-per-student-per-day records
+- [x] Secondary student enrollment requires explicit consent and stores only the descriptor, never the photo
+- [x] Secondary check-in/check-out works via face match
+- [x] A failed facial match falls back to the shared manual-marking mechanism — no duplicated logic
+- [x] Grade-based routing is enforced at the view level in both directions
+- [x] One attendance record per student per day enforced at the database level
+- [x] Attendance is viewable/markable by any teacher, not scoped to one teacher's records
+- [x] All views reject non-teacher roles, consistent with existing sprints
+- [x] Tests cover the grade addition, manual roll-call, consent-gatedenrollment, successful and failed facial match, the shared fallback, routing enforcement for both grade bands, and multi-teacher access
+- [x] New test module added to the sprint-to-module mapping in `run.sh` so `./run.sh sprint 5` and `./run.sh sprint-pg 5` pick it up
+
+## Out of scope for this sprint
+
+Student or parent-facing attendance views (Sprint 6/7), continuous or live facial detection (already rejected earlier), attendance reporting or analytics.
+
+## Known limitations
+
+- **No class/roster structure yet** (carried over from Sprints 3/4) — the primary roll-call lists every grade 1–7 student, not a specific teacher's class.
+- **Absence is implicit, not explicit.** A student with no attendance record for the day is treated as absent by omission; there's no explicit "marked absent" state yet.
+- **Parent-student linking is still self-declared and unverified**
+  (carried over from Sprint 1) — unchanged by this sprint.
+
+## Next up — Sprint 6
+
+Build the parent portal: parent login to see a child's homework/exam results and attendance, plus AI-generated plain-language notifications pushed via the Twilio WhatsApp sandbox.

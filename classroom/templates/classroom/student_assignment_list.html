@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}My assignments &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>My assignments</h1>
+    <p class="page-head__lead">
+      Work your teachers have set. Submit a photo of your answers and iSgela
+      marks it, with feedback on every question.
+    </p>
+  </div>
+
+  {% if assignments %}
+    <ul class="record-list">
+      {% for assignment in assignments %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ assignment.title }}</p>
+            <p class="record__meta">
+              {% if assignment.due_date %}
+                {% if assignment.is_past_due %}Was due {{ assignment.due_date|date:"j M Y" }}{% else %}Due {{ assignment.due_date|date:"j M Y" }}{% endif %}
+              {% else %}
+                No deadline
+              {% endif %}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if assignment.student_paper %}
+              {% if assignment.student_paper.status == 'marked' %}
+                <span class="badge badge--marked">Submitted</span>
+                <a class="button button--secondary" href="{% url 'marking:my_result_detail' assignment.student_paper.pk %}">See result</a>
+              {% elif assignment.student_paper.status == 'failed' %}
+                <span class="badge badge--failed">Submitted, marking failed</span>
+                <a class="button button--secondary" href="{% url 'marking:my_result_detail' assignment.student_paper.pk %}">Open</a>
+              {% else %}
+                <span class="badge badge--pending">Submitted, waiting</span>
+                <a class="button button--secondary" href="{% url 'marking:my_result_detail' assignment.student_paper.pk %}">Open</a>
+              {% endif %}
+            {% else %}
+              <span class="badge badge--neutral">Not yet submitted</span>
+              <a class="button" href="{% url 'classroom:submit_homework' assignment.pk %}">Submit homework</a>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No assignments yet</h3>
+      <p class="empty__body">
+        When a teacher sets work, it appears here with what you need to do and
+        when it is due.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}
