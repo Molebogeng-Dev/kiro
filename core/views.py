@@ -12,6 +12,7 @@ from django.shortcuts import redirect, render
 
 from accounts.models import Role
 from accounts.permissions import role_required
+from classroom.models import Assignment, StudyMaterial
 from marking.models import Memorandum, Paper
 
 # Enough to show the work is happening, few enough that the actions stay visible
@@ -58,7 +59,30 @@ def teacher_dashboard(request):
 
 @role_required(Role.STUDENT)
 def student_dashboard(request):
-    return render(request, "core/dashboard_student.html", {"nav_active": "dashboard"})
+    recent_papers = (
+        Paper.objects.filter(student=request.user)
+        .select_related("memorandum", "assignment", "result")
+        .order_by("-created_at")[:RECENT_PAPER_COUNT]
+    )
+
+    # Assignments this student has not submitted yet, so the dashboard can nudge
+    # toward the next thing to do rather than just linking around.
+    submitted_assignment_ids = Paper.objects.filter(
+        student=request.user, assignment__isnull=False
+    ).values_list("assignment_id", flat=True)
+    to_do_count = Assignment.objects.exclude(id__in=submitted_assignment_ids).count()
+
+    return render(
+        request,
+        "core/dashboard_student.html",
+        {
+            "recent_papers": recent_papers,
+            "to_do_count": to_do_count,
+            "has_materials": StudyMaterial.objects.exists(),
+            "first_name": request.user.first_name,
+            "nav_active": "dashboard",
+        },
+    )
 
 
 @role_required(Role.PARENT)

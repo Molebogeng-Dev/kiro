@@ -336,3 +336,74 @@ def marking_history(request):
             "nav_active": "history",
         },
     )
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 4: a student's own results
+# --------------------------------------------------------------------------- #
+#
+# The ownership boundary here is student=request.user, the mirror of the
+# teacher's submitted_by=request.user. A student sees only papers that are
+# theirs, and a paper is theirs when they are its subject, regardless of who
+# uploaded it (a teacher could have marked their exam). URL-guessing another
+# student's paper id returns a 404, because the filter excludes it before the
+# lookup, not after.
+
+
+@role_required(Role.STUDENT)
+def my_results(request):
+    """A student's own marked work, most recent first."""
+    papers = (
+        Paper.objects.filter(student=request.user)
+        .select_related("memorandum", "assignment", "result")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "marking/my_results.html",
+        {
+            "papers": papers,
+            "marked_count": sum(1 for p in papers if p.status == Paper.Status.MARKED),
+            "nav_active": "results",
+        },
+    )
+
+
+@role_required(Role.STUDENT)
+def my_result_detail(request, pk):
+    """One of the student's own papers. Another student's id 404s."""
+    paper = get_object_or_404(
+        Paper.objects.select_related("memorandum", "assignment", "result"),
+        pk=pk,
+        student=request.user,
+    )
+
+    questions = (
+        paper.result.questions.all() if paper.status == Paper.Status.MARKED else []
+    )
+
+    return render(
+        request,
+        "marking/my_result_detail.html",
+        {"paper": paper, "questions": questions, "nav_active": "results"},
+    )
+
+
+@role_required(Role.STUDENT)
+@require_POST
+def my_result_retry(request, pk):
+    """Re-mark the student's own stored paper after a failure.
+
+    Same engine path as the teacher retry; only the ownership filter and the
+    redirect target differ.
+    """
+    paper = get_object_or_404(Paper, pk=pk, student=request.user)
+
+    submission = remark(paper)
+    if submission.succeeded:
+        messages.success(request, "Marked. Here is your result.")
+    else:
+        messages.error(request, paper.failure_message)
+
+    return redirect("marking:my_result_detail", pk=paper.pk)

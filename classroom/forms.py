@@ -1,4 +1,4 @@
-"""Teacher-facing forms for posting work and material."""
+"""Forms for posting work and material, and for submitting homework."""
 
 from django import forms
 from django.utils import timezone
@@ -6,6 +6,26 @@ from django.utils import timezone
 from marking.models import Memorandum
 
 from .models import Assignment, StudyMaterial
+
+
+class HomeworkSubmissionForm(forms.Form):
+    """A learner's homework photo.
+
+    Only a photo. The assignment is fixed by the URL and the learner is taken
+    from request.user server-side, so neither can be chosen — and neither can be
+    spoofed — through this form. Validation and compression happen in
+    ``marking.submissions`` / ``core.images``, which produce messages aimed at
+    someone holding a phone.
+    """
+
+    image = forms.FileField(
+        label="Photo of your work",
+        help_text="A JPEG or PNG. Take it straight on, with the whole page in "
+        "the frame. It is rotated and shrunk automatically.",
+        widget=forms.ClearableFileInput(
+            attrs={"accept": "image/jpeg,image/png", "capture": "environment"}
+        ),
+    )
 
 
 class AssignmentForm(forms.ModelForm):

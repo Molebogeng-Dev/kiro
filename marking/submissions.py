@@ -57,19 +57,25 @@ def process_paper_image(uploaded_file) -> ProcessedImage:
     )
 
 
-def create_paper(*, submitted_by, memorandum, processed, student=None) -> Paper:
+def create_paper(
+    *, submitted_by, memorandum, processed, student=None, assignment=None
+) -> Paper:
     """Store the image and record the paper.
 
     When a learner uploads their own homework, they are both the submitter and
     the subject, so the learner is filled in automatically. A teacher has to say
-    whose work it is.
+    whose work it is. ``assignment`` ties a homework submission back to the work
+    it answers, and is left unset for a loose paper a teacher is marking.
     """
     if student is None and submitted_by.role == Role.STUDENT:
         student = submitted_by
 
     with transaction.atomic():
         paper = Paper(
-            submitted_by=submitted_by, memorandum=memorandum, student=student
+            submitted_by=submitted_by,
+            memorandum=memorandum,
+            student=student,
+            assignment=assignment,
         )
         paper.full_clean(exclude=["image"])
         # Saving the image is what uploads it to Supabase Storage. The filename
@@ -81,7 +87,7 @@ def create_paper(*, submitted_by, memorandum, processed, student=None) -> Paper:
 
 
 def submit_for_marking(
-    *, uploaded_file, memorandum, submitted_by, student=None
+    *, uploaded_file, memorandum, submitted_by, student=None, assignment=None
 ) -> Submission:
     """Validate, store, and mark in one call.
 
@@ -95,6 +101,7 @@ def submit_for_marking(
         memorandum=memorandum,
         processed=processed,
         student=student,
+        assignment=assignment,
     )
 
     try:

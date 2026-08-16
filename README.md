@@ -26,7 +26,8 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
 ## What it does
 
 - **Scan & Mark** — teachers photograph a paper or students submit homework by camera; AI marks it against the memorandum and explains *why* an answer was wrong, not just that it was and also suggests solutions on how to help the student if they struggled. 
-- **Attendance** — single facial-recognition scan at arrival and departure, no manual register. Uploads the record on both the parent and teacher's portal
+- **Attendance** — primary students (grades 1–7) are marked present through a traditional roll-call register; secondary students (grades 8–12) check in and out via a single facial-recognition scan, deliberately mirroring a professional check-in environment. Both feed the same attendance record, visible on the parent and teacher portals.
+
 - **Three connected portals** — teacher, student, and parent each see what matters to them, in one place
 - **Parent notifications** — plain-language summaries sent automatically when homework/exam is marked
 
@@ -267,6 +268,38 @@ box to the learner picker, confirms which photo was chosen, and shows progress
 while marking runs, which matters because marking is synchronous and takes up to
 a minute. Every page works with JavaScript blocked.
 
+## The student portal
+
+`classroom/` and `marking/` also hold the student-facing pages (Sprint 4). A
+student views what teachers posted and submits homework through the *same*
+`marking/submissions.py` path the teacher uses — no marking logic is duplicated.
+
+| Page | Path |
+| --- | --- |
+| Dashboard | `/student/` |
+| My assignments | `/classroom/my-assignments/` |
+| Submit homework | `/classroom/my-assignments/<id>/submit/` |
+| My results | `/marking/my-results/` |
+| One result | `/marking/my-results/<id>/` |
+| Study material | `/classroom/study-materials/` |
+
+Two boundaries matter here:
+
+- **Ownership.** A student sees only papers where they are the subject
+  (`student=request.user`). Guessing another student's result id returns a 404,
+  not a 403 — the filter excludes it before the lookup, so the page never
+  confirms it exists.
+- **Server-set attribution.** When a student submits homework, `Paper.student`
+  is taken from the session, never from the request body. The submission form
+  carries only the photo; the assignment comes from the URL. A tampered request
+  with someone else's id is ignored, and a test posts exactly that to prove it.
+
+A `Paper` now also records the `assignment` it answers (nullable, `SET_NULL`),
+distinct from its memorandum, so the assignments list can show "submitted" or
+"not yet" per student. The result page is shared with the teacher through a
+single `marking/_result_body.html` partial, so a marked paper looks the same to
+whoever is entitled to see it.
+
 ### Task runner
 
 `run.sh` wraps the common commands and finds the virtualenv itself:
@@ -275,6 +308,10 @@ a minute. Every page works with JavaScript blocked.
 ./run.sh              # dev server (default port 1097)
 ./run.sh test         # suite against in-memory SQLite
 ./run.sh test-pg      # same suite against Supabase Postgres
+./run.sh sprint 4     # one sprint's tests (in-memory SQLite)
+./run.sh sprint-pg 4  # one sprint's tests against Supabase Postgres
+./run.sh sprints      # every sprint's tests, one labelled group at a time
+./run.sh sprints-pg   # the same, against Supabase Postgres
 ./run.sh check        # system checks + unapplied-migration check
 ./run.sh ci           # check + test, no server. Use this in a pipeline.
 ```
@@ -298,6 +335,19 @@ TEST_ON_POSTGRES=True python manage.py test --keepdb
 
 `--keepdb` is required: Supabase's pooler holds a session open, which stops
 Django from dropping the test database afterwards.
+
+To read results grouped by sprint rather than as one combined total, use
+`./run.sh sprints` (or `./run.sh sprint <n>` for a single one), with `-pg`
+variants (`./run.sh sprints-pg`, `./run.sh sprint-pg <n>`) to run each group
+against Supabase Postgres. The mapping of test modules to sprints lives in
+`run.sh`; every module belongs to exactly one sprint, so a failure points
+straight at the sprint that owns it.
+
+These sprint commands use a concise test runner (`config/test_runner.py`) that
+stays silent about passing tests and names only the ones that fail, error, or
+are skipped — with full tracebacks and a count summary underneath, the way
+pytest's short summary reads. `./run.sh test`, `test-pg`, and `ci` keep Django's
+default output.
 
 ## Continuous integration
 

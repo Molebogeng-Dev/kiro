@@ -9,20 +9,21 @@ Student-facing views arrive in Sprint 4 and will read the same models.
 """
 
 from django.contrib import messages
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from accounts.models import Role
 from accounts.permissions import role_required
 from core.images import ImageValidationError
-from marking.models import Memorandum
+from marking.models import Memorandum, Paper
+from marking.submissions import submit_for_marking
 from marking.transcription import (
     TranscriptionError,
     TranscriptionKind,
     transcribe_upload,
 )
 
-from .forms import AssignmentForm, StudyMaterialForm
+from .forms import AssignmentForm, HomeworkSubmissionForm, StudyMaterialForm
 from .models import Assignment, StudyMaterial
 
 
@@ -153,4 +154,117 @@ def material_create(request):
         request,
         "classroom/material_form.html",
         {"form": form, "nav_active": "materials"},
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 4: the student portal
+# --------------------------------------------------------------------------- #
+#
+# Study materials and assignments are visible to every student for now, since
+# there is no class or roster structure yet (the Sprint 3 limitation, carried
+# forward). What is scoped per-student is the submission status and the results:
+# a student sees whether *they* have submitted, and only their own marked work.
+
+
+@role_required(Role.STUDENT)
+def student_material_list(request):
+    """Every study material a teacher has posted."""
+    materials = StudyMaterial.objects.select_related("created_by").order_by(
+        "-created_at"
+    )
+    return render(
+        request,
+        "classroom/student_material_list.html",
+        {"materials": materials, "nav_active": "materials"},
+    )
+
+
+@role_required(Role.STUDENT)
+def student_material_detail(request, pk):
+    """One study material to read."""
+    material = get_object_or_404(
+        StudyMaterial.objects.select_related("created_by"), pk=pk
+    )
+    return render(
+        request,
+        "classroom/student_material_detail.html",
+        {"material": material, "nav_active": "materials"},
+    )
+
+
+@role_required(Role.STUDENT)
+def student_assignment_list(request):
+    """Assignments, each flagged with whether this student has submitted.
+
+    The submission status is computed from one query rather than one per
+    assignment: fetch the student's latest paper per assignment up front and
+    attach it, so a long list is still a couple of queries.
+    """
+    assignments = Assignment.objects.select_related("memorandum").order_by(
+        "-created_at"
+    )
+
+    # assignment_id -> the student's most recent paper for it. Ordered newest
+    # last so the dict ends up holding the newest per assignment.
+    latest_by_assignment = {}
+    student_papers = (
+        Paper.objects.filter(student=request.user, assignment__isnull=False)
+        .select_related("result")
+        .order_by("created_at")
+    )
+    for paper in student_papers:
+        latest_by_assignment[paper.assignment_id] = paper
+
+    for assignment in assignments:
+        assignment.student_paper = latest_by_assignment.get(assignment.id)
+
+    return render(
+        request,
+        "classroom/student_assignment_list.html",
+        {"assignments": assignments, "nav_active": "assignments"},
+    )
+
+
+@role_required(Role.STUDENT)
+@require_http_methods(["GET", "POST"])
+def submit_homework(request, pk):
+    """Submit a photo of homework for one assignment.
+
+    The assignment comes from the URL and the learner from ``request.user`` —
+    never from the request body — so a submission cannot be attributed to
+    another student. This goes through the same ``submit_for_marking`` path as
+    teacher marking; nothing about the pipeline is re-implemented here.
+    """
+    assignment = get_object_or_404(
+        Assignment.objects.select_related("memorandum"), pk=pk
+    )
+    form = HomeworkSubmissionForm(request.POST or None, request.FILES or None)
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            submission = submit_for_marking(
+                uploaded_file=form.cleaned_data["image"],
+                memorandum=assignment.memorandum,
+                submitted_by=request.user,
+                # Server-set from the session. The security requirement of this
+                # sprint: a student can never submit work as someone else.
+                student=request.user,
+                assignment=assignment,
+            )
+        except ImageValidationError as exc:
+            form.add_error("image", str(exc))
+        else:
+            if submission.succeeded:
+                messages.success(
+                    request, "Homework submitted and marked. Here is your result."
+                )
+            else:
+                messages.error(request, submission.paper.failure_message)
+            return redirect("marking:my_result_detail", pk=submission.paper.pk)
+
+    return render(
+        request,
+        "classroom/submit_homework.html",
+        {"assignment": assignment, "form": form, "nav_active": "assignments"},
     )

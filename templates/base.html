@@ -65,6 +65,19 @@
               <a class="site-nav__link" href="{% url 'classroom:material_list' %}"
                  {% if nav_active == 'materials' %}aria-current="page"{% endif %}>Study material</a>
             </li>
+          {% elif user.is_student %}
+            <li>
+              <a class="site-nav__link" href="{% url 'classroom:student_assignment_list' %}"
+                 {% if nav_active == 'assignments' %}aria-current="page"{% endif %}>My assignments</a>
+            </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'marking:my_results' %}"
+                 {% if nav_active == 'results' %}aria-current="page"{% endif %}>My results</a>
+            </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'classroom:student_material_list' %}"
+                 {% if nav_active == 'materials' %}aria-current="page"{% endif %}>Study material</a>
+            </li>
           {% endif %}
 
           {% if user.is_staff %}

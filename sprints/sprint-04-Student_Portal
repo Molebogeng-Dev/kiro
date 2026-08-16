@@ -24,6 +24,48 @@ Sprint 4 gives students their front door: viewing what teachers have posted, and
 - **Access control** — all views reject non-student roles, consistent with Sprints 1 and 3
 - **Tests** — role rejection, the student-spoofing attempt, the mocked marking flow, and assignment-submission-status display
 
+## Implementation notes
+
+Decisions worth having on record.
+
+- **`Paper.assignment`, a nullable `SET_NULL` FK.** It records which assignment a
+  submission answers, distinct from the memorandum it is marked against. Nullable
+  because a teacher marking a loose exam script is not answering any assignment;
+  `SET_NULL` rather than `CASCADE` so deleting an assignment can never delete a
+  learner's marked work. Declared with a string reference (`"classroom.Assignment"`)
+  to avoid an import cycle, since `classroom` already points at `marking`.
+
+- **The submission pipeline was reused, not rebuilt.** Homework goes through the
+  same `marking/submissions.py` `submit_for_marking` as teacher marking; the only
+  additions were an `assignment=` argument and a student-only form. Compression,
+  storage, the AI call, and defensive parsing are all the Sprint 2/3 code.
+
+- **Server-set attribution is structural, not a check.** The homework form
+  (`HomeworkSubmissionForm`) has one field: the photo. The assignment comes from
+  the URL and `Paper.student` from `request.user`. There is no student field to
+  spoof — a tampered `student=` in the body is simply never read. A test posts
+  that tampered request and asserts the paper still belongs to the logged-in
+  student.
+
+- **Ownership boundary mirrors Sprint 3.** A student's results are filtered by
+  `student=request.user`; `my_result_detail` does `get_object_or_404(pk=pk,
+  student=request.user)`, so another student's id returns 404 (the paper is
+  excluded before the lookup) rather than 403 (which would confirm it exists).
+
+- **One result presentation, two audiences.** The marked/failed result body was
+  extracted into `marking/_result_body.html`, included by both the teacher's
+  `paper_detail` and the student's `my_result_detail`. Each supplies its own
+  navigation (retry URL, back link) via `{% url ... as %}`, so the marking
+  result is rendered one way, and the failure/retry state a student sees is
+  literally the teacher's, not a copy.
+
+- **Per-sprint test grouping.** `run.sh sprint <n>` and `run.sh sprints` run the
+  suite one sprint at a time with a banner and a pass/fail summary, so a
+  regression names the sprint that owns it instead of hiding in a single total.
+  The module-to-sprint mapping lives in `run.sh`; the per-sprint counts sum to
+  the full-suite count, which is the check that every test belongs to exactly one
+  sprint.
+
 ## Definition of done
 
 - [x] Student can view study materials and assignments

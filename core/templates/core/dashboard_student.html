@@ -6,16 +6,87 @@
   <div class="page-head">
     <h1>Welcome, Student</h1>
     <p class="page-head__lead">
-      Your homework, study material, and feedback will appear here.
+      {% if first_name %}Hi {{ first_name }}. {% endif %}Your homework, study material, and feedback live here.
     </p>
   </div>
 
-  <div class="empty">
-    <h3 class="empty__title">Nothing here yet</h3>
-    <p class="empty__body">
-      Your teachers can already set assignments and post study material. Being
-      able to open them, and to photograph your homework so it gets marked, is
-      the next thing being built.
+  <ul class="action-grid">
+    <li>
+      <a class="action-card" href="{% url 'classroom:student_assignment_list' %}">
+        <span class="action-card__title">My assignments</span>
+        <span class="action-card__hint">
+          {% if to_do_count %}
+            You have {{ to_do_count }} assignment{{ to_do_count|pluralize }} still to submit.
+          {% else %}
+            See what your teachers have set and submit your homework.
+          {% endif %}
+        </span>
+        <span class="action-card__go">Open assignments &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'marking:my_results' %}">
+        <span class="action-card__title">My results</span>
+        <span class="action-card__hint">
+          See your marked work, with feedback on every question.
+        </span>
+        <span class="action-card__go">See results &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'classroom:student_material_list' %}">
+        <span class="action-card__title">Study material</span>
+        <span class="action-card__hint">
+          {% if has_materials %}
+            Notes and explanations your teachers have shared.
+          {% else %}
+            Notes from your teachers will show up here.
+          {% endif %}
+        </span>
+        <span class="action-card__go">Open material &rarr;</span>
+      </a>
+    </li>
+  </ul>
+
+  <h2>Recent results</h2>
+
+  {% if recent_papers %}
+    <ul class="record-list">
+      {% for paper in recent_papers %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">
+              {% if paper.assignment %}{{ paper.assignment.title }}{% else %}{{ paper.memorandum.title }}{% endif %}
+            </p>
+            <p class="record__meta">Submitted {{ paper.created_at|date:"j M Y, H:i" }}</p>
+          </div>
+          <div class="record__aside">
+            {% if paper.status == 'marked' %}
+              <span class="record__score tabular">
+                {{ paper.result.marks_awarded|floatformat }}/{{ paper.result.marks_available|floatformat }}
+              </span>
+              <span class="badge badge--marked">Marked</span>
+            {% elif paper.status == 'failed' %}
+              <span class="badge badge--failed">Marking failed</span>
+            {% else %}
+              <span class="badge badge--pending">Waiting</span>
+            {% endif %}
+            <a class="button button--secondary" href="{% url 'marking:my_result_detail' paper.pk %}">Open</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+    <p style="margin-top:1rem">
+      <a href="{% url 'marking:my_results' %}">See all my results</a>
     </p>
-  </div>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No results yet</h3>
+      <p class="empty__body">
+        Submit homework for one of your assignments and iSgela will mark it, with
+        feedback on every question.
+      </p>
+      <a class="button" href="{% url 'classroom:student_assignment_list' %}">See my assignments</a>
+    </div>
+  {% endif %}
 {% endblock %}

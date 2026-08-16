@@ -17,4 +17,8 @@ urlpatterns = [
     path("papers/", views.marking_history, name="marking_history"),
     path("papers/<int:pk>/", views.paper_detail, name="paper_detail"),
     path("papers/<int:pk>/retry/", views.paper_retry, name="paper_retry"),
+    # Sprint 4: a student's own results.
+    path("my-results/", views.my_results, name="my_results"),
+    path("my-results/<int:pk>/", views.my_result_detail, name="my_result_detail"),
+    path("my-results/<int:pk>/retry/", views.my_result_retry, name="my_result_retry"),
 ]

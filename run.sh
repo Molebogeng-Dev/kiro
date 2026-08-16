@@ -6,6 +6,10 @@
 #   ./run.sh serve [port] start the dev server
 #   ./run.sh test [args]  run the suite against in-memory SQLite
 #   ./run.sh test-pg      run the same suite against Supabase Postgres
+#   ./run.sh sprint <n>    run one sprint's tests (in-memory SQLite)
+#   ./run.sh sprint-pg <n> run one sprint's tests against Supabase Postgres
+#   ./run.sh sprints       run every sprint's tests, one labelled group at a time
+#   ./run.sh sprints-pg    the same, against Supabase Postgres
 #   ./run.sh check        system checks and unapplied-migration check
 #   ./run.sh migrate      apply migrations
 #   ./run.sh ci           check + test, no server. Use this in a pipeline.
@@ -145,9 +149,113 @@ cmd_all() {
     cmd_serve
 }
 
+# --------------------------------------------------------------------------- #
+# Per-sprint test grouping
+# --------------------------------------------------------------------------- #
+#
+# The suite grows every sprint, and "289 tests OK" hides which sprint a failure
+# belongs to. These commands run the tests one sprint at a time, with a banner
+# and a per-sprint pass/fail summary, so a regression points straight at the
+# sprint that owns it. The mapping of test modules to sprints lives here, in one
+# readable place; each module below belongs to exactly one sprint.
+
+LATEST_SPRINT=4
+
+sprint_labels() {
+    case "$1" in
+        1) echo "accounts config.tests" ;;
+        2) echo "core.tests marking.tests.test_parsing marking.tests.test_openrouter marking.tests.test_engine marking.tests.test_images marking.tests.test_views" ;;
+        3) echo "marking.tests.test_teacher_portal marking.tests.test_transcription classroom.tests.test_views classroom.tests.test_transcription" ;;
+        4) echo "classroom.tests.test_student_portal marking.tests.test_student_results" ;;
+        *) return 1 ;;
+    esac
+}
+
+sprint_title() {
+    case "$1" in
+        1) echo "Foundation — accounts, roles, database config" ;;
+        2) echo "AI Scan & Mark engine" ;;
+        3) echo "Teacher portal" ;;
+        4) echo "Student portal" ;;
+        *) echo "Sprint $1" ;;
+    esac
+}
+
+# The concise runner reports only the tests that fail, error, or are skipped,
+# and stays silent about passes. Defined in config/test_runner.py.
+SPRINT_RUNNER="config.test_runner.ConciseTestRunner"
+
+_db_label() { [ "$1" = "pg" ] && echo "Supabase Postgres" || echo "in-memory SQLite"; }
+
+# Run one sprint's tests. $1 = sprint number, $2 = mode (sqlite|pg); any further
+# arguments pass through to manage.py test. Returns the test command's exit code.
+_sprint_tests() {
+    local n="$1" mode="$2"; shift 2
+    local labels; labels=$(sprint_labels "${n}")
+    if [ "${mode}" = "pg" ]; then
+        # --keepdb: Supabase's pooler blocks the test-database teardown.
+        TEST_ON_POSTGRES=True "${PYTHON}" manage.py test --keepdb \
+            --testrunner "${SPRINT_RUNNER}" ${labels} "$@"
+    else
+        "${PYTHON}" manage.py test --testrunner "${SPRINT_RUNNER}" ${labels} "$@"
+    fi
+}
+
+# One sprint. Fails hard (via the ERR trap) if its tests do not pass.
+_run_sprint() {
+    local mode="$1"; shift
+    [ $# -ge 1 ] || fail "Which sprint? For example: ./run.sh sprint 4"
+    local n="$1"; shift
+    sprint_labels "${n}" >/dev/null 2>&1 || fail "Unknown sprint '${n}' (1 to ${LATEST_SPRINT})."
+
+    banner "SPRINT ${n} — $(sprint_title "${n}")  ($(_db_label "${mode}"))"
+    _sprint_tests "${n}" "${mode}" "$@"
+    echo ""
+    echo "${GREEN}Sprint ${n} passed${RESET}"
+}
+
+cmd_sprint()    { _run_sprint sqlite "$@"; }
+cmd_sprint_pg() { _run_sprint pg "$@"; }
+
+# Every sprint in turn. Records failures instead of aborting so each sprint gets
+# to report, prints a summary, and exits non-zero if any sprint failed.
+_run_sprints() {
+    local mode="$1"
+    # A string, not an array, so `set -u` stays happy when nothing has failed.
+    local failed="" n
+
+    for n in $(seq 1 "${LATEST_SPRINT}"); do
+        banner "SPRINT ${n} — $(sprint_title "${n}")  ($(_db_label "${mode}"))"
+        # Inside an `if` so a failing sprint is recorded, not fatal.
+        if _sprint_tests "${n}" "${mode}"; then
+            echo "${GREEN}Sprint ${n}: passed${RESET}"
+        else
+            echo "${RED}Sprint ${n}: FAILED${RESET}"
+            failed="${failed} ${n}"
+        fi
+    done
+
+    banner "SPRINT TEST SUMMARY  ($(_db_label "${mode}"))"
+    for n in $(seq 1 "${LATEST_SPRINT}"); do
+        case " ${failed} " in
+            *" ${n} "*) echo "  ${RED}Sprint ${n}: FAILED${RESET}" ;;
+            *)          echo "  ${GREEN}Sprint ${n}: passed${RESET}" ;;
+        esac
+    done
+    echo ""
+
+    if [ -n "${failed# }" ]; then
+        fail "Sprints with failures:${failed}"
+    fi
+    echo "${GREEN}All ${LATEST_SPRINT} sprints passed.${RESET}"
+}
+
+cmd_sprints()    { _run_sprints sqlite; }
+cmd_sprints_pg() { _run_sprints pg; }
+
 usage() {
-    # Lines 2-17 are the usage block at the top of this file.
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    # Lines 2-21 are the usage block at the top of this file.
+    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # --------------------------------------------------------------------------- #
@@ -161,6 +269,10 @@ case "${command}" in
     serve|server|run)  cmd_serve "$@" ;;
     test)              cmd_test "$@" ;;
     test-pg|test-postgres) cmd_test_pg "$@" ;;
+    sprint)            cmd_sprint "$@" ;;
+    sprint-pg|sprint-postgres) cmd_sprint_pg "$@" ;;
+    sprints)           cmd_sprints ;;
+    sprints-pg|sprints-postgres) cmd_sprints_pg ;;
     check)             cmd_check ;;
     migrate)           cmd_migrate ;;
     ci)                cmd_ci ;;

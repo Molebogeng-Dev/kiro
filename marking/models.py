@@ -129,6 +129,22 @@ class Paper(models.Model):
         help_text="The learner whose work this is.",
     )
 
+    # The assignment this paper answers, when a learner submitted it for one.
+    # Distinct from the memorandum: the memorandum is how it is marked, the
+    # assignment is what it responds to, and the student portal needs the latter
+    # to show "submitted / not yet" per assignment. Nullable because a teacher
+    # marking a loose exam script is not answering any assignment. SET_NULL, not
+    # CASCADE: deleting an assignment must never delete a learner's marked work.
+    # A string reference avoids an import cycle (classroom already points here).
+    assignment = models.ForeignKey(
+        "classroom.Assignment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="submissions",
+        help_text="The assignment this paper answers, if it was submitted for one.",
+    )
+
     image = models.ImageField(upload_to=paper_image_path, storage=papers_storage)
 
     status = models.CharField(
