@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Check in / out &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Period check-in</h1>
+    <p class="page-head__lead">
+      Secondary learners (grades 8–12). Hold the device and scan each student in
+      turn — one quick face check per student, this period. If the camera cannot
+      recognise someone, mark them present by hand below. The first scan of the
+      day is their arrival; each later scan updates their latest check-in.
+    </p>
+  </div>
+
+  {% if result == 'scan' and matched %}
+    <div class="card">
+      <div class="score">
+        <span class="badge badge--marked">Checked in</span>
+      </div>
+      <p style="margin-top:0.75rem">
+        {{ matched.get_full_name|default:matched.username }} (Grade {{ matched.grade }})
+        checked in for this period{% if first_today %} — first scan today{% endif %}.
+      </p>
+      <p class="muted small">Pass the device to the next student and start the camera again.</p>
+    </div>
+  {% endif %}
+
+  <div class="panel" style="margin-bottom:1.5rem">
+    <h2 class="card__title">Scan a student</h2>
+    <div class="camera" data-attendance data-model-url="{{ faceapi_model_url }}" data-auto-submit>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="descriptor" data-descriptor>
+        <video data-camera hidden playsinline muted class="camera__video"></video>
+        <div class="button-row">
+          <button type="button" class="button button--secondary" data-start>
+            {% if result == 'scan' %}Scan next student{% else %}Start camera{% endif %}
+          </button>
+          <button type="button" class="button" data-capture>Capture &amp; scan</button>
+        </div>
+        <p class="form__help" data-status role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 class="card__title">Mark present by hand</h2>
+    <p class="muted">
+      The fallback for when a face will not match — this is the same manual
+      marking the primary roll-call uses, and it works without a camera.
+    </p>
+    <form method="post" action="{% url 'attendance:mark_present' %}" class="form" novalidate>
+      {% csrf_token %}
+      {% include "partials/field.html" with field=fallback_form.student %}
+      <div class="form__actions">
+        <button type="submit" class="button button--secondary">Mark present</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="{{ faceapi_script_url }}" defer></script>
+  <script src="{% static 'js/attendance.js' %}" defer></script>
+{% endblock %}

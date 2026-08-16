@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Attendance</h1>
+    <p class="page-head__lead">
+      Primary learners (grades 1–7) are marked by roll-call. Secondary learners
+      (grades 8–12) check in and out by camera, with a manual fallback.
+    </p>
+  </div>
+
+  <ul class="summary-row">
+    <li><strong class="tabular">{{ present_today }}</strong> present today</li>
+    <li><strong class="tabular">{{ primary_total }}</strong> primary learners</li>
+    <li><strong class="tabular">{{ secondary_total }}</strong> secondary learners</li>
+    <li><strong class="tabular">{{ enrolled_total }}</strong> faces enrolled</li>
+  </ul>
+
+  <ul class="action-grid">
+    <li>
+      <a class="action-card" href="{% url 'attendance:roll_call' %}">
+        <span class="action-card__title">Roll-call (grades 1–7)</span>
+        <span class="action-card__hint">Tick the primary learners who are here today.</span>
+        <span class="action-card__go">Open roll-call &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'attendance:check_in' %}">
+        <span class="action-card__title">Check in / out (grades 8–12)</span>
+        <span class="action-card__hint">Camera check-in for secondary learners, with a manual fallback.</span>
+        <span class="action-card__go">Open check-in &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'attendance:enroll' %}">
+        <span class="action-card__title">Enroll a face</span>
+        <span class="action-card__hint">Register a secondary learner's face, with their consent.</span>
+        <span class="action-card__go">Enroll &rarr;</span>
+      </a>
+    </li>
+    <li>
+      <a class="action-card" href="{% url 'attendance:history' %}">
+        <span class="action-card__title">Today's attendance</span>
+        <span class="action-card__hint">Who has been marked present, by either method.</span>
+        <span class="action-card__go">View list &rarr;</span>
+      </a>
+    </li>
+  </ul>
+{% endblock %}

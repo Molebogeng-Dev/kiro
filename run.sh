@@ -159,7 +159,7 @@ cmd_all() {
 # sprint that owns it. The mapping of test modules to sprints lives here, in one
 # readable place; each module below belongs to exactly one sprint.
 
-LATEST_SPRINT=4
+LATEST_SPRINT=5
 
 sprint_labels() {
     case "$1" in
@@ -167,6 +167,7 @@ sprint_labels() {
         2) echo "core.tests marking.tests.test_parsing marking.tests.test_openrouter marking.tests.test_engine marking.tests.test_images marking.tests.test_views" ;;
         3) echo "marking.tests.test_teacher_portal marking.tests.test_transcription classroom.tests.test_views classroom.tests.test_transcription" ;;
         4) echo "classroom.tests.test_student_portal marking.tests.test_student_results" ;;
+        5) echo "attendance" ;;
         *) return 1 ;;
     esac
 }
@@ -177,6 +178,7 @@ sprint_title() {
         2) echo "AI Scan & Mark engine" ;;
         3) echo "Teacher portal" ;;
         4) echo "Student portal" ;;
+        5) echo "Attendance (grade-based)" ;;
         *) echo "Sprint $1" ;;
     esac
 }
@@ -266,17 +268,33 @@ command="${1:-serve}"
 [ $# -gt 0 ] && shift
 
 case "${command}" in
-    serve|server|run)  cmd_serve "$@" ;;
-    test)              cmd_test "$@" ;;
-    test-pg|test-postgres) cmd_test_pg "$@" ;;
-    sprint)            cmd_sprint "$@" ;;
-    sprint-pg|sprint-postgres) cmd_sprint_pg "$@" ;;
-    sprints)           cmd_sprints ;;
-    sprints-pg|sprints-postgres) cmd_sprints_pg ;;
-    check)             cmd_check ;;
-    migrate)           cmd_migrate ;;
-    ci)                cmd_ci ;;
-    all)               cmd_all ;;
+    # app info
     -h|--help|help)    usage ;;
+
+    # app
+    serve|server|run)  cmd_serve "$@" ;;
+
+    # overall test
+    test)              cmd_test "$@" ;;
+    test-pg|test-postgres) cmd_test_pg "$@" ;; # server
+
+    # individual iteration test
+    sprint)            cmd_sprint "$@" ;;
+    sprints)           cmd_sprints ;;
+    sprint-pg|sprint-postgres) cmd_sprint_pg "$@" ;; # server
+    sprints-pg|sprints-postgres) cmd_sprints_pg ;; # server
+
+    # sync shema with database
+    migrate)           cmd_migrate ;;
+
+    # local continuous integration
+    ci)                cmd_ci ;;
+
+    # configuration and migration state check. RUN BEFORE PUSH
+    check)             cmd_check ;;
+
+    # running everything at once
+    all)               cmd_all ;;
+
     *)                 echo "unknown command: ${command}" >&2; echo "" >&2; usage >&2; exit 64 ;;
 esac

@@ -4,6 +4,35 @@
 
 Sprint 5 builds attendance, but not as a single mechanism for everyone. Facial recognition applies only to secondary students (grades 8–12). Primary students (grades 1–7) get a traditional manual roll-call register instead — deliberately avoiding a biometric, workplace-style check-in for young children, while giving secondary students something closer to a professional check-in environment as preparation for the world beyond school.
 
+## Update — per-period check-in
+
+After the initial build, the secondary flow was changed from one arrival scan and
+one departure scan per day to a **per-period, pass-the-device loop**: the teacher
+carries the device round the room and scans each student at every class change.
+This needs no class/period/timetable structure — only a record of each scan.
+
+- **`AttendanceScan`** logs every check-in (student, the day's `Attendance`,
+  timestamp, method, recorded-by). Many per student per day.
+- **`Attendance` is now a rollup** for secondary learners: `arrived_at` is the
+  first scan of the day, `departed_at` the most recent — so `departed_at` only
+  becomes a true departure retroactively, once no later scan arrives. No "last
+  scan" flag; the rollup handles it.
+- **The manual fallback simplified**: every scan is just a period check-in, so a
+  failed match records a manual-method `AttendanceScan` like any other, with no
+  arrival/departure distinction to decide.
+- **Primary roll-call is unaffected** — still one presence tick per day, no scans.
+- Only a teacher initiates each capture; there is no student-triggered scan path.
+
+Done in this update:
+
+- [x] Each face or manual check-in during the day creates an `AttendanceScan`
+- [x] `arrived_at` reflects the first scan, `departed_at` the most recent
+- [x] Many scans per student per day, without violating one-`Attendance`-row-per-day
+- [x] The check-in UI is a pass-the-device loop: capture, confirm, reset, next
+- [x] Only a teacher can initiate a scan
+- [x] Tests cover the rollup, first-scan arrival, latest-scan departure, and the
+      fallback creating a scan without knowing arrival vs departure
+
 ## Goals
 
 - Add a `grade` field to `User` so attendance can route by grade band
@@ -15,14 +44,65 @@ Sprint 5 builds attendance, but not as a single mechanism for everyone. Facial r
 ## What was built
 
 - **`User.grade`** — integer field, 1–12, added to the existing student registration form from Sprint 1 as a required field for students. A small addition to existing auth, not new auth work.
-- **`Attendance` model** — student (FK), date, `method` (`"manual"` / `"facial"`), `arrived_at` (nullable), `departed_at` (nullable). One record per student per day, enforced at the database level. Viewable and markable by any teacher — not scoped to whoever created the record, since this is a shared front-desk function, not personal marking work.
+- **`Attendance` model** — student (FK), date, `method` (`"manual"` / `"facial"`), `arrived_at` (nullable), `departed_at` (nullable). One record per student per day, enforced at the database level. For secondary learners it is a rollup of the day's `AttendanceScan`s (see the per-period update above). Viewable and markable by any teacher — not scoped to whoever created the record, since this is a shared front-desk function, not personal marking work.
 - **Primary flow (grades 1–7)** — a register view listing all grade 1–7 students (no class/roster structure yet, same known limitation as Sprints 3/4). Teacher ticks who's present, submits; creates `Attendance(method="manual", arrived_at=now)` per student for today. No `departed_at` tracking — a register records presence, not clock-in/clock-out. A student with no record for the day is implicitly absent.
 - **`FaceEnrollment` model (secondary only)** — student (FK), stored face descriptor (never the source photo), enrolled-by, enrolled-at, and a `consent_confirmed` boolean the enrolling teacher must explicitly check
 - **Enrollment flow** — teacher selects a secondary student, captures a reference photo via browser camera, confirms consent, saves. Re-enrolling updates the existing descriptor rather than duplicating it.
-- **Check-in/check-out flow (secondary)** — camera captures a frame, face-api.js matches against enrolled descriptors. On match: sets `arrived_at` if unset today, otherwise `departed_at`, `method="facial"`.
-- **Shared manual fallback** — a failed facial match reuses the exact same manual-marking mechanism the primary flow uses, rather than a second, duplicated manual-entry path
+- **`AttendanceScan` model (secondary)** — one row per check-in event: student, the day's `Attendance` (FK), timestamp, `method`, `recorded_by`. Many per student per day (see the per-period update above).
+- **Per-period check-in flow (secondary)** — the teacher scans each student in turn; each scan appends an `AttendanceScan` via one shared `record_scan`, and the day's `Attendance` rolls up (`arrived_at` = first scan, `departed_at` = most recent). `method="facial"` on a match.
+- **Shared scan path** — a failed facial match records a manual-method `AttendanceScan` through the same `record_scan`, so there is one per-period path, not a duplicated manual-entry one. (Primary roll-call keeps its own presence-only `mark_present_manually`, unchanged.)
 - **Grade-based routing enforced server-side** — a grade 1–7 student is never offered facial enrollment; a grade 8–12 student doesn't appear in the manual roll-call list except via the fallback path. Enforced at the view level based on `User.grade`, not hidden UI.
 - **Attendance history** — a list viewable by any teacher, showing who's been marked present today across both methods, with the method that produced each record
+
+## Implementation notes
+
+Decisions worth having on record, including two I want to flag explicitly.
+
+- **The face match runs server-side, not in the browser.** The spec reads
+  "face-api.js matches against enrolled descriptors", which could be taken as
+  client-side matching. I did it the other way: the browser uses face-api.js
+  only to turn a camera frame into a 128-float descriptor, posts that, and the
+  comparison happens on the server (`attendance/matching.py`, euclidean distance,
+  face-api.js's own 0.6 threshold). Two reasons — these are children's biometric
+  vectors, and client-side matching would mean shipping every enrolled
+  descriptor to whatever device runs the check-in; and server-side matching is
+  testable without a browser. The check-in station is teacher-operated, so a
+  teacher-supplied descriptor is an acceptable trust boundary. Flagging because
+  it is a real deviation from a literal reading.
+
+- **Per-period rollup (post-build refinement).** The day's `Attendance` for a
+  secondary learner is derived from its `AttendanceScan`s: the first sets
+  `arrived_at`, every scan moves `departed_at` to its own time. `departed_at` is
+  therefore "most recent scan so far", a true departure only once the day ends
+  with no later scan — no flag marks the last one. This also resolved an earlier
+  flag about manual departure: with every scan being just a period check-in, the
+  fallback needs no arrival/departure distinction at all.
+
+- **Two clean paths, not one muddled one.** Primary roll-call uses
+  `mark_present_manually` (a presence tick, no scans). Every secondary per-period
+  check-in — facial or manual fallback — uses `record_scan`, which appends a scan
+  and rolls up the day. Each path exists once; the fallback and the facial flow
+  share `record_scan`, so a no-match is genuinely the same code as a match, only
+  with `method="manual"`.
+
+- **Grade routing is enforced in four places, all server-side.** Enrollment: the
+  form queryset is secondary-only *and* `FaceEnrollment.clean()` refuses a
+  primary student. Roll-call: the list is primary-only *and* the POST handler
+  filters submitted ids against the primary set, so a tampered secondary id does
+  nothing. The fallback is secondary-only. None of it relies on hidden UI.
+
+- **Only the descriptor is stored.** `FaceEnrollment` has no photo field by
+  design; the reference image is used in the browser and discarded. Consent is a
+  required boolean the enrolling teacher must tick, enforced by the form and the
+  model.
+
+- **Absence stays implicit, as the spec intended.** A student with no row for a
+  day was not marked present; there is no "absent" state. Built as specified —
+  it reads fine to me, so no change proposed.
+
+- **`User.grade`** is nullable on the model (teachers and parents have none) and
+  required for students by the registration form, not the database — a small
+  addition to Sprint 1's auth, not a rebuild.
 
 ## Definition of done
 

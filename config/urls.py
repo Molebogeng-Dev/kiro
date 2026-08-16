@@ -8,6 +8,7 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("marking/", include("marking.urls")),
     path("classroom/", include("classroom.urls")),
+    path("attendance/", include("attendance.urls")),
     # Dashboards live at the root: /teacher/, /student/, /parent/
     path("", include("core.urls")),
 ]

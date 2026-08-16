@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Today's attendance &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Today's attendance</h1>
+    <p class="page-head__lead">{{ today|date:"l j F Y" }} &middot; everyone marked present, by either method.</p>
+  </div>
+
+  {% if records %}
+    <ul class="record-list">
+      {% for record in records %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ record.student.get_full_name|default:record.student.username }}</p>
+            <p class="record__meta">
+              Grade {{ record.student.grade }}
+              {% if record.arrived_at %} &middot; in {{ record.arrived_at|time:"H:i" }}{% endif %}
+              {% if record.departed_at %} &middot; out {{ record.departed_at|time:"H:i" }}{% endif %}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if record.method == 'facial' %}
+              <span class="badge badge--marked">Facial</span>
+            {% else %}
+              <span class="badge badge--neutral">Roll-call</span>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No one marked present yet today</h3>
+      <p class="empty__body">
+        Run the roll-call for primary learners, or check secondary learners in
+        by camera, and they will appear here.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

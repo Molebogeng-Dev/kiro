@@ -65,6 +65,10 @@
               <a class="site-nav__link" href="{% url 'classroom:material_list' %}"
                  {% if nav_active == 'materials' %}aria-current="page"{% endif %}>Study material</a>
             </li>
+            <li>
+              <a class="site-nav__link" href="{% url 'attendance:index' %}"
+                 {% if nav_active == 'attendance' %}aria-current="page"{% endif %}>Attendance</a>
+            </li>
           {% elif user.is_student %}
             <li>
               <a class="site-nav__link" href="{% url 'classroom:student_assignment_list' %}"

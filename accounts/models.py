@@ -8,6 +8,7 @@ authorisation (which dashboards you are refused).
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -17,6 +18,16 @@ class Role(models.TextChoices):
     TEACHER = "teacher", "Teacher"
     STUDENT = "student", "Student"
     PARENT = "parent", "Parent"
+
+
+# The two grade bands. Attendance (Sprint 5) treats them differently: primary
+# learners are marked by a manual roll-call, secondary learners by facial
+# check-in. Kept here, next to Role, because "which band is this learner in"
+# is an account fact the whole app reasons about, not an attendance detail.
+PRIMARY_GRADE_MAX = 7
+SECONDARY_GRADE_MIN = 8
+MIN_GRADE = 1
+MAX_GRADE = 12
 
 
 # Where each role goes after logging in. Kept next to Role so that adding a
@@ -46,6 +57,17 @@ class User(AbstractUser):
     # Unique so it can become the login identifier or a notification target
     # later without a data migration to clean up duplicates.
     email = models.EmailField(unique=True)
+
+    # Only meaningful for students; null for teachers and parents. Required at
+    # student registration by the form, not the database, so a teacher/parent
+    # row stays clean with no grade. The value decides which attendance flow a
+    # student belongs to (grades 1-7 manual, 8-12 facial).
+    grade = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(MIN_GRADE), MaxValueValidator(MAX_GRADE)],
+        help_text="1 to 12. Only set for students.",
+    )
 
     # Placeholder link to the stub School model. The real school/class
     # structure lands in a later sprint.
@@ -79,6 +101,24 @@ class User(AbstractUser):
     @property
     def is_parent(self) -> bool:
         return self.role == Role.PARENT
+
+    @property
+    def is_primary_student(self) -> bool:
+        """A student in grades 1-7 (manual roll-call band)."""
+        return (
+            self.role == Role.STUDENT
+            and self.grade is not None
+            and self.grade <= PRIMARY_GRADE_MAX
+        )
+
+    @property
+    def is_secondary_student(self) -> bool:
+        """A student in grades 8-12 (facial check-in band)."""
+        return (
+            self.role == Role.STUDENT
+            and self.grade is not None
+            and self.grade >= SECONDARY_GRADE_MIN
+        )
 
     @property
     def dashboard_url_name(self) -> str | None:

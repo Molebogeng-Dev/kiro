@@ -300,6 +300,50 @@ distinct from its memorandum, so the assignments list can show "submitted" or
 single `marking/_result_body.html` partial, so a marked paper looks the same to
 whoever is entitled to see it.
 
+## Attendance
+
+`attendance/` (Sprint 5) takes attendance two ways, chosen by the student's
+grade, and lands both on one `Attendance` row (one per student per day, enforced
+by the database) so later sprints read presence without caring how it was taken.
+
+Secondary check-in is **per period**, not once a day: the teacher passes the
+device round the room and scans each student at every class change. Each scan
+(facial, or manual on a no-match) is an `AttendanceScan`; the day's `Attendance`
+is a rollup where `arrived_at` is the first scan and `departed_at` the most
+recent, so a departure is only ever the last scan seen, decided retroactively.
+Primary roll-call is unchanged — one presence tick a day, no scans.
+
+| Page | Path | Who it lists |
+| --- | --- | --- |
+| Attendance hub | `/attendance/` | — |
+| Roll-call | `/attendance/roll-call/` | Primary learners, grades 1–7 |
+| Period check-in | `/attendance/check-in/` | Secondary learners, grades 8–12 |
+| Enroll a face | `/attendance/enroll/` | Secondary learners |
+| Today's attendance | `/attendance/history/` | Everyone present today |
+
+Every page is teacher-only, and unlike the marking pages it is **not** scoped to
+the teacher who created a record: attendance is a shared front-desk function, so
+any teacher can run the roll-call, work the check-in station, or read the list.
+
+Three things are worth knowing:
+
+- **Grade routing is enforced on the server, not by hiding buttons.** A primary
+  learner is never accepted for facial enrollment (the form's queryset and the
+  model both refuse), and a secondary learner never appears in the roll-call
+  list; a tampered roll-call POST carrying a secondary id is filtered out in the
+  view. Secondary learners reach manual marking only through the fallback.
+- **The face match happens on the server, not in the browser.** face-api.js runs
+  in the browser only to turn a camera frame into a 128-number descriptor; that
+  descriptor is posted and compared here (euclidean distance, face-api.js's own
+  0.6 threshold). This is a deliberate choice for a children's biometric feature:
+  the enrolled descriptors never leave the server, and the check-in station is
+  teacher-operated. The reference photo is never sent or stored — only the
+  descriptor is kept, and only with the enrolling teacher's confirmed consent.
+- **A failed match is never a dead end.** No-match offers the same manual marking
+  the roll-call uses (one shared `mark_present_manually`), so there is a single
+  manual path, not two. The manual paths work without JavaScript; the camera
+  pages need it by nature and always show the manual fallback underneath.
+
 ### Task runner
 
 `run.sh` wraps the common commands and finds the virtualenv itself:

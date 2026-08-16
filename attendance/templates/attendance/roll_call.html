@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Roll-call &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Roll-call</h1>
+    <p class="page-head__lead">
+      Grades 1–7, {{ today|date:"l j F Y" }}. Tick who is here and submit.
+      {% if present_count %}<strong>{{ present_count }}</strong> already marked present today.{% endif %}
+    </p>
+  </div>
+
+  {% if students %}
+    <form method="post" class="form">
+      {% csrf_token %}
+      <div class="card">
+        <ul class="checklist">
+          {% for student in students %}
+            <li class="checklist__item">
+              <label class="checklist__label">
+                <input type="checkbox" name="present" value="{{ student.id }}"
+                       {% if student.is_present_today %}checked{% endif %}>
+                <span>
+                  {{ student.get_full_name|default:student.username }}
+                  <span class="muted small">Grade {{ student.grade }}{% if student.is_present_today %} &middot; present{% endif %}</span>
+                </span>
+              </label>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="form__actions">
+        <button type="submit" class="button">Save roll-call</button>
+        <p class="form__help">
+          Ticking a learner already marked present changes nothing. Unticking does
+          not remove them — a register records who arrived, and this sprint has no
+          "mark absent".
+        </p>
+      </div>
+    </form>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No primary learners yet</h3>
+      <p class="empty__body">
+        When students in grades 1–7 register, they appear here for roll-call.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

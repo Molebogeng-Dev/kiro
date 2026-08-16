@@ -64,6 +64,8 @@ LOCAL_APPS = [
     "marking",
     # Assignments and study material a teacher posts for learners.
     "classroom",
+    # Grade-based attendance: manual roll-call and facial check-in.
+    "attendance",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
@@ -309,3 +311,27 @@ OPENROUTER_MAX_TOKENS = config("OPENROUTER_MAX_TOKENS", default=2000, cast=int)
 # dashboard. Optional, and purely for our own observability.
 OPENROUTER_APP_URL = config("OPENROUTER_APP_URL", default="https://github.com/isgela")
 OPENROUTER_APP_TITLE = config("OPENROUTER_APP_TITLE", default="iSgela")
+
+
+# --------------------------------------------------------------------------- #
+# Attendance (facial check-in)
+# --------------------------------------------------------------------------- #
+
+# Maximum euclidean distance between two face descriptors for them to count as
+# the same person. 0.6 is face-api.js's own default; lower is stricter. Applied
+# server-side when matching a check-in against enrolled descriptors.
+ATTENDANCE_FACE_MATCH_THRESHOLD = config(
+    "ATTENDANCE_FACE_MATCH_THRESHOLD", default=0.6, cast=float
+)
+
+# face-api.js is loaded in the browser for the enrollment and check-in pages
+# only. These point the client at the library and its model weights; kept in
+# settings so a self-hosted copy can replace the CDN without touching templates.
+FACEAPI_SCRIPT_URL = config(
+    "FACEAPI_SCRIPT_URL",
+    default="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js",
+)
+FACEAPI_MODEL_URL = config(
+    "FACEAPI_MODEL_URL",
+    default="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model",
+)

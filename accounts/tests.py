@@ -100,6 +100,9 @@ class RegistrationTests(TestCase):
             "last_name": "Person",
             "email": f"{username}@example.com",
             "role": getattr(role, "value", role),
+            # Required for students since Sprint 5; harmless for other roles,
+            # where the form discards it.
+            "grade": "8",
             "password1": PASSWORD,
             "password2": PASSWORD,
         }

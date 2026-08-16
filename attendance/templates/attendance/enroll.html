@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Enroll a face &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Enroll a face</h1>
+    <p class="page-head__lead">
+      For secondary learners (grades 8–12) only. The photo is used in your
+      browser to compute a face descriptor; the photo itself is never sent to or
+      stored on the server — only the descriptor is kept.
+    </p>
+  </div>
+
+  <div class="alert alert--info" role="note">
+    <span class="alert__label">Consent:</span>
+    <span>
+      Only enroll a student who has agreed to facial check-in. You must confirm
+      this below before it will save.
+    </span>
+  </div>
+
+  <div class="panel">
+    <form method="post" class="form" data-attendance data-model-url="{{ faceapi_model_url }}" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <ul class="form__errors" role="alert">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+
+      {% include "partials/field.html" with field=form.student %}
+
+      <div class="form__field">
+        <span class="form__label">Reference photo</span>
+        <span class="form__help">
+          Start the camera, line up the student's face, then capture. Needs a
+          camera and JavaScript.
+        </span>
+        <div class="camera">
+          <video data-camera hidden playsinline muted class="camera__video"></video>
+          <div class="button-row">
+            <button type="button" class="button button--secondary" data-start>Start camera</button>
+            <button type="button" class="button button--secondary" data-capture>Capture face</button>
+          </div>
+          <p class="form__help" data-status role="status" aria-live="polite"></p>
+        </div>
+        {{ form.descriptor }}
+        {% if form.descriptor.errors %}
+          <ul class="form__errors" role="alert">
+            {% for error in form.descriptor.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      {% include "partials/field.html" with field=form.consent_confirmed %}
+
+      <div class="form__actions">
+        <button type="submit" class="button" data-submit>Save enrollment</button>
+      </div>
+    </form>
+  </div>
+
+  {% if enrolled %}
+    <h2 style="margin-top:2rem">Already enrolled</h2>
+    <ul class="record-list">
+      {% for enrollment in enrolled %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ enrollment.student.get_full_name|default:enrollment.student.username }}</p>
+            <p class="record__meta">
+              Grade {{ enrollment.student.grade }} &middot; enrolled {{ enrollment.enrolled_at|date:"j M Y" }}
+            </p>
+          </div>
+          <div class="record__aside">
+            <span class="badge badge--marked">Enrolled</span>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <script src="{{ faceapi_script_url }}" defer></script>
+  <script src="{% static 'js/attendance.js' %}" defer></script>
+{% endblock %}
