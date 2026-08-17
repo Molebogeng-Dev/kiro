@@ -98,6 +98,12 @@ fi
 # Tasks
 # --------------------------------------------------------------------------- #
 
+db_test() {
+    "${PYTHON}" manage.py db_latency    
+
+
+}
+
 cmd_check() {
     banner "CHECKS: configuration and migration state"
     "${PYTHON}" manage.py check
@@ -270,6 +276,9 @@ command="${1:-serve}"
 case "${command}" in
     # app info
     -h|--help|help)    usage ;;
+
+    # db latency overall
+    db-time)           db_test ;;
 
     # app
     serve|server|run)  cmd_serve "$@" ;;
