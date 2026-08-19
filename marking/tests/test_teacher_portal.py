@@ -135,7 +135,10 @@ class MemorandumAuthoringTests(TestCase):
         )
 
         memorandum = Memorandum.objects.get(created_by=self.teacher)
-        self.assertEqual(memorandum.subject, "")
+        # Subject is still optional on the form, but a blank one now files under
+        # the default rather than an empty string, so the progress dashboard has
+        # a subject to group by (Sprint 7).
+        self.assertEqual(memorandum.subject, "General")
         self.assertIsNone(memorandum.total_marks)
 
     def test_a_guide_too_short_to_mark_against_is_rejected(self):

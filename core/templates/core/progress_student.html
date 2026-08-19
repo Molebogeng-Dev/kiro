@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ student.get_full_name|default:student.username }} &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ student.get_full_name|default:student.username }}</h1>
+    <p class="page-head__lead">
+      Grade {{ student.grade|default:"—" }} &middot; a rollup of marks, attendance,
+      and assignments.
+    </p>
+  </div>
+
+  {% comment %}
+  Why flagged, shown first and in full — a teacher should see the reason, not
+  take the flag on faith. Each line is one triggered threshold rule.
+  {% endcomment %}
+  {% if rollup.needs_attention %}
+    <div class="alert alert--warning" role="status">
+      <span class="alert__label">Needs attention:</span>
+      <div>
+        <ul style="margin:0.25rem 0 0; padding-left:1.1rem">
+          {% for reason in rollup.reasons %}<li>{{ reason }}</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert--success" role="status">
+      <span class="alert__label">On track:</span>
+      <span>Marks, attendance, and assignments are all within the usual range.</span>
+    </div>
+  {% endif %}
+
+  <h2>Marks by subject</h2>
+  {% if rollup.subjects %}
+    <p class="muted">
+      Overall average
+      <strong class="tabular">{{ rollup.overall_average|floatformat:0 }}%</strong>
+      across {{ rollup.subjects|length }} subject{{ rollup.subjects|length|pluralize }}.
+    </p>
+    <ul class="record-list">
+      {% for subject in rollup.subjects %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ subject.subject }}</p>
+            <p class="record__meta">
+              {{ subject.paper_count }} marked paper{{ subject.paper_count|pluralize }}
+            </p>
+          </div>
+          <div class="record__aside">
+            <span class="record__score tabular">{{ subject.average|floatformat:0 }}%</span>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No marked work yet</h3>
+      <p class="empty__body">Marks appear here once this learner has a marked paper.</p>
+    </div>
+  {% endif %}
+
+  <h2 style="margin-top:2rem">Attendance</h2>
+  {% if rollup.attendance.rate is not None %}
+    <dl class="detail-grid">
+      <div>
+        <dt>Recent rate</dt>
+        <dd class="tabular">{{ rollup.attendance.rate|floatformat:0 }}%</dd>
+      </div>
+      <div>
+        <dt>Days present</dt>
+        <dd class="tabular">
+          {{ rollup.attendance.present_days }} of {{ rollup.attendance.school_days }}
+        </dd>
+      </div>
+    </dl>
+    <p class="muted small">
+      Measured over the last {{ rollup.attendance.school_days }} day{{ rollup.attendance.school_days|pluralize }}
+      attendance was taken.
+    </p>
+  {% else %}
+    <p class="muted">Not enough attendance history yet to measure a rate.</p>
+  {% endif %}
+
+  <h2 style="margin-top:2rem">Assignments</h2>
+  <dl class="detail-grid">
+    <div>
+      <dt>Submitted</dt>
+      <dd class="tabular">
+        {{ rollup.assignments.submitted }} of {{ rollup.assignments.total }}
+      </dd>
+    </div>
+    <div>
+      <dt>Missed (past due)</dt>
+      <dd class="tabular">{{ rollup.assignments.missed_past_due }}</dd>
+    </div>
+  </dl>
+
+  <p style="margin-top:1.5rem">
+    <a href="{% url 'core:progress_dashboard' %}">&larr; Back to all learners</a>
+  </p>
+{% endblock %}

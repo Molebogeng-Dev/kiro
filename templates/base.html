@@ -54,6 +54,10 @@
                  {% if nav_active == 'history' %}aria-current="page"{% endif %}>Marked papers</a>
             </li>
             <li>
+              <a class="site-nav__link" href="{% url 'core:progress_dashboard' %}"
+                 {% if nav_active == 'progress' %}aria-current="page"{% endif %}>Student progress</a>
+            </li>
+            <li>
               <a class="site-nav__link" href="{% url 'marking:memorandum_list' %}"
                  {% if nav_active == 'memorandums' %}aria-current="page"{% endif %}>Memorandums</a>
             </li>

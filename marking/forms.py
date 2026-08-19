@@ -106,7 +106,9 @@ class MemorandumForm(forms.ModelForm):
         }
         help_texts = {
             "title": "For example: Grade 4 Mathematics Test 1, Term 3.",
-            "subject": "Optional, but it helps the marking read subject notation correctly.",
+            "subject": "For example Mathematics or Life Orientation. It helps the "
+            "marking read subject notation, and groups this paper's marks by "
+            "subject on the progress dashboard. Left blank, it files under General.",
             "total_marks": "Optional. Used only as a sanity check on the marks that come back.",
             "content": (
                 "One question at a time: the question number, the answer you "

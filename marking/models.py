@@ -19,6 +19,23 @@ from accounts.models import Role
 from core.images import OUTPUT_EXTENSION
 from core.storage import papers_storage
 
+# Every memorandum has a subject, so marks can be grouped by it on the progress
+# dashboard (Sprint 7). A memo written without one is filed here rather than
+# left blank, which would break the grouping.
+DEFAULT_SUBJECT = "General"
+
+
+def normalize_subject(value) -> str:
+    """Tidy a free-text subject so near-duplicates group as one.
+
+    Strips surrounding whitespace and title-cases, so "maths" and "Maths "
+    both become "Maths" and land in the same bucket on the dashboard. An empty
+    or whitespace-only value becomes the default rather than a blank that would
+    silently form its own group.
+    """
+    cleaned = (value or "").strip()
+    return cleaned.title() if cleaned else DEFAULT_SUBJECT
+
 
 def paper_image_path(instance, filename):
     """Bucket path for an uploaded paper.
@@ -44,8 +61,10 @@ class Memorandum(models.Model):
     subject = models.CharField(
         max_length=100,
         blank=True,
-        help_text="Optional. Included in the prompt, which helps the model "
-        "interpret notation in subjects like Mathematics.",
+        default=DEFAULT_SUBJECT,
+        help_text="Included in the marking prompt (it helps the model read "
+        "subject notation) and used to group marks by subject on the progress "
+        "dashboard. Normalized on save; defaults to General if left blank.",
     )
 
     content = models.TextField(
@@ -73,6 +92,13 @@ class Memorandum(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        # Normalize here rather than only in the form so every path — admin,
+        # transcription, tests, a future import — files marks under a tidy,
+        # groupable subject.
+        self.subject = normalize_subject(self.subject)
+        super().save(*args, **kwargs)
 
 
 class Paper(models.Model):

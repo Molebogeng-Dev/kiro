@@ -10,11 +10,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
-from accounts.models import Role
+from accounts.models import Role, User
 from accounts.permissions import role_required
 from attendance.models import Attendance
 from classroom.models import Assignment, StudyMaterial
 from marking.models import Memorandum, Paper
+
+from .progress import build_class_overview, build_student_rollup
 
 # Enough to show the work is happening, few enough that the actions stay visible
 # without scrolling on a laptop.
@@ -86,6 +88,52 @@ def student_dashboard(request):
             "first_name": request.user.first_name,
             "nav_active": "dashboard",
         },
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 7: the teacher progress dashboard
+# --------------------------------------------------------------------------- #
+#
+# Access follows attendance (Sprint 5), not marking ownership (Sprint 3): any
+# teacher may view any learner's rollup. Without class or roster structure, a
+# whole-school progress view is more useful than one scoped to "papers I
+# personally marked" — the same reasoning attendance used. It is read-only; it
+# aggregates data other sprints already produced and collects nothing new.
+
+
+@role_required(Role.TEACHER)
+def progress_dashboard(request):
+    """Every learner, each with a transparent rule-based needs-attention flag."""
+    rollups = build_class_overview()
+    flagged = [rollup for rollup in rollups if rollup.needs_attention]
+    on_track = [rollup for rollup in rollups if not rollup.needs_attention]
+
+    return render(
+        request,
+        "core/progress_list.html",
+        {
+            # Flagged learners first so a teacher sees who needs help without
+            # scrolling; alphabetical within each group (from the query).
+            "students": flagged + on_track,
+            "flagged_count": len(flagged),
+            "total_count": len(rollups),
+            "nav_active": "progress",
+        },
+    )
+
+
+@role_required(Role.TEACHER)
+def progress_student(request, student_id):
+    """One learner's rollup: per-subject marks, attendance, assignments, and the
+    reasons behind any flag — so a teacher sees *why*, not just *that*."""
+    student = get_object_or_404(User, id=student_id, role=Role.STUDENT)
+    rollup = build_student_rollup(student)
+
+    return render(
+        request,
+        "core/progress_student.html",
+        {"student": student, "rollup": rollup, "nav_active": "progress"},
     )
 
 

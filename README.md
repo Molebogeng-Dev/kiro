@@ -30,6 +30,7 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
 
 - **Three connected portals** — teacher, student, and parent each see what matters to them, in one place
 - **Parent notifications** — plain-language summaries sent automatically when homework/exam is marked
+- **Progress dashboard** — a teacher's whole-school rollup of marks, attendance, and assignments per learner, flagging who needs attention by transparent, rule-based thresholds (no AI)
 
 ## Known limitations
 
@@ -471,6 +472,56 @@ moving notification to a background worker is the natural next step, flagged for
 after the MVP. New env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_WHATSAPP_FROM` (all optional — with none set, a notification is simply
 recorded as `failed` and marking is unaffected).
+
+## The progress dashboard
+
+`core/` also holds the teacher-facing progress dashboard (Sprint 7), the piece
+that ties the others together. It is **read-only**: it aggregates marks,
+attendance, and assignment data three earlier sprints already produce, and
+collects nothing new. The aggregation lives in `core/progress.py`, kept apart
+from the views so the rules are testable without a browser.
+
+| Page | Path |
+| --- | --- |
+| Student progress (list) | `/progress/` |
+| One learner's rollup | `/progress/student/<id>/` |
+
+Access follows **attendance** (Sprint 5), not marking ownership (Sprint 3): any
+teacher can view any learner's rollup. Without class or roster structure, a
+whole-school view is more useful than one scoped to "papers I personally
+marked", and that is the same reasoning attendance used. Every page rejects
+non-teachers at the view.
+
+The list carries a **"needs attention" flag** that is rule-based, never an AI
+call — so a teacher who asks "why is this learner flagged?" gets a specific,
+checkable answer, and the reason is shown on the list and in full on the rollup.
+The thresholds live as constants in `core/progress.py`:
+
+| Rule | Threshold | Notes |
+| --- | --- | --- |
+| Low average mark | below 50% | Mean of the learner's marked-paper percentages. Silent if they have no marks yet. |
+| Low attendance | below 80% | Over the recent school-day window (see below). Silent if no attendance has been taken. |
+| Missed assignments | 2 or more | Past their due date with nothing submitted. |
+
+A **"school day" is a day attendance was actually taken** — the recent window is
+the last 10 distinct dates on which *any* attendance was recorded, and a
+learner's rate is how many of those days they were present. There is no school
+calendar in the MVP and absence is implicit (no row means not marked present),
+so this self-calibrating definition avoids counting weekends and holidays that
+were never school days. It is explained on the rollup page.
+
+The per-learner rollup shows per-subject averages (grouped by
+`Memorandum.subject`), the attendance summary, and assignment completion, and
+lists the exact reasons behind any flag — a teacher sees *why*, not just *that*.
+
+`Memorandum.subject` (which predates this sprint) is now normalized on save
+(stripped and title-cased) and defaults to `General`, so "maths", "Maths ", and
+a blank subject no longer fragment the grouping; a migration backfilled existing
+records through the same normalization.
+
+If the threshold numbers turn out not to mean much against real data, they are a
+one-line change each and the reasons update to match — they are deliberately not
+buried.
 
 ## Continuous integration
 

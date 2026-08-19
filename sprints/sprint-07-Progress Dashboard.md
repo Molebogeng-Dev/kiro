@@ -10,7 +10,8 @@ new data, it only surfaces what already exists.
 
 ## Goals
 
-- Group marks meaningfully by adding a lightweight `subject` field
+- Group marks meaningfully by normalizing the existing `subject` field
+  and backfilling old records
 - Let any teacher view any student's rollup — same reasoning as
   attendance's any-teacher access, not marking's per-teacher ownership
 - Surface a transparent, rule-based "needs attention" flag so a
@@ -42,6 +43,66 @@ new data, it only surfaces what already exists.
   flag are visible on this page, not just asserted
 - **Polish pass** — spacing, empty states, and wording consistency
   across Sprints 1–6's pages; no new features, no redesign
+
+## Implementation notes
+
+Decisions and two things I want to flag explicitly, since the brief
+asked for them but the codebase already had them.
+
+- **`subject` already existed — I enhanced it, I didn't add it.** The
+  field has been on `Memorandum` since the marking engine (used in the
+  prompt so the model reads subject notation). What was missing, and
+  what this sprint added, is the normalization on save (strip +
+  title-case), the `"General"` default, and a migration that
+  backfills existing rows through the *same* `normalize_subject`
+  function the model uses — so the one-off backfill and ongoing saves
+  can never drift apart.
+
+- **"Upload a picture" for a memorandum/assignment already exists —
+  flagging rather than duplicating.** Both create forms already let a
+  teacher photograph a memorandum or an assignment's instructions and
+  have the vision model transcribe it into the form to review before
+  saving (the Sprint 3 transcription feature, `marking/transcription.py`).
+  That is exactly "upload a picture when uploading a memorandum /
+  assignment", so I did not build a second path. If what was wanted is
+  different — storing the *image itself* as an attachment on the
+  memorandum/assignment rather than transcribing it to text — that is a
+  new feature (a field, storage, and display) and I have left it out
+  pending a steer, because it would change how marking reads a
+  memorandum.
+
+- **A "school day" is a day attendance was taken.** There is no school
+  calendar in the MVP and absence is implicit (no row means not marked
+  present). So the attendance window is the most recent 10 *distinct
+  dates on which any attendance was recorded*, and a learner's rate is
+  how many of those they were present. This is self-calibrating and
+  explainable, and it avoids penalising a learner for weekends and
+  holidays that were never school days. The rollup page states the
+  window it used.
+
+- **The flag is rule-based and its reasons are returned as text.** All
+  three thresholds are constants in `core/progress.py`; each rule
+  emits a specific sentence ("Average mark 35% is below 50%") that the
+  list and the rollup show verbatim, so "why is this flagged?" is
+  always answerable. A rule stays silent when it has no data to judge
+  on (no marks yet, no attendance taken).
+
+- **Aggregation is separated from the views.** `core/progress.py` does
+  all the rolling-up as plain functions over the models, so the flag
+  logic and the averages are tested directly, without a browser. The
+  list builds every learner's rollup from a handful of bulk queries
+  rather than a query set per learner.
+
+- **Assignment completion is against every assignment, no roster.**
+  "Submitted 2 of 40" reflects the standing no-class/roster limitation
+  (an assignment is visible to every learner), consistent with the
+  student dashboard. Only *past-due, unsubmitted* assignments feed the
+  flag, so a learner is never flagged for work that is not due yet.
+
+- **Thresholds are honest defaults, and I'd tune them on real data.**
+  50% / 80% / 2-missed are reasonable starting lines, not validated
+  pedagogy. They are one-line changes and the reason strings follow
+  automatically.
 
 ## Definition of done
 

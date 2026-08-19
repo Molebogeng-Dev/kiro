@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Student progress &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Student progress</h1>
+    <p class="page-head__lead">
+      How every learner is doing across marks, attendance, and assignments.
+      Anyone who needs a closer look is flagged, with the reason shown.
+    </p>
+  </div>
+
+  {% if students %}
+    <ul class="summary-row">
+      <li><strong>{{ total_count }}</strong> learner{{ total_count|pluralize }}</li>
+      <li>
+        {% if flagged_count %}
+          <strong>{{ flagged_count }}</strong> need{{ flagged_count|pluralize:"s," }} attention
+        {% else %}
+          none need attention right now
+        {% endif %}
+      </li>
+    </ul>
+
+    <ul class="record-list">
+      {% for rollup in students %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">
+              {{ rollup.student.get_full_name|default:rollup.student.username }}
+            </p>
+            <p class="record__meta">Grade {{ rollup.student.grade|default:"—" }}</p>
+            {% if rollup.needs_attention %}
+              {% for reason in rollup.reasons %}
+                <p class="record__meta small">&bull; {{ reason }}</p>
+              {% endfor %}
+            {% endif %}
+          </div>
+          <div class="record__aside">
+            {% if rollup.needs_attention %}
+              <span class="badge badge--failed">Needs attention</span>
+            {% else %}
+              <span class="badge badge--marked">On track</span>
+            {% endif %}
+            <a class="button button--secondary"
+               href="{% url 'core:progress_student' rollup.student.id %}">View</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No learners yet</h3>
+      <p class="empty__body">
+        Once learners register, they appear here with a rollup of their marks,
+        attendance, and assignments.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}
