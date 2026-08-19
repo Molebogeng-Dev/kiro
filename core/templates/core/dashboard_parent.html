@@ -6,31 +6,33 @@
   <div class="page-head">
     <h1>Welcome, Parent</h1>
     <p class="page-head__lead">
-      Your child's marked work, attendance, and progress will appear here.
+      Choose a child to see their marked work and attendance.
     </p>
   </div>
 
-  {% with children=user.children %}
-    {% if children %}
-      <h2>Your learners</h2>
-      <ul class="record-list">
-        {% for child in children %}
-          <li class="record">
-            <div class="record__main">
-              <p class="record__title">{{ child.get_full_name|default:child.username }}</p>
-              <p class="record__meta">Linked to your account</p>
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <div class="empty">
-        <h3 class="empty__title">No learner linked yet</h3>
-        <p class="empty__body">
-          Once your child's account is linked to yours, their marked work and
-          attendance will show up here automatically.
-        </p>
-      </div>
-    {% endif %}
-  {% endwith %}
+  {% if children %}
+    <h2>Your children</h2>
+    <ul class="record-list">
+      {% for child in children %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ child.get_full_name|default:child.username }}</p>
+            <p class="record__meta">Grade {{ child.grade|default:"—" }}</p>
+          </div>
+          <div class="record__aside">
+            <a class="button" href="{% url 'core:parent_child' child.id %}">View</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No child linked yet</h3>
+      <p class="empty__body">
+        Once your child's account is linked to yours, their marked work and
+        attendance show up here automatically. You can link a child from the
+        registration page.
+      </p>
+    </div>
+  {% endif %}
 {% endblock %}

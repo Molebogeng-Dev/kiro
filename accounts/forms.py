@@ -3,7 +3,14 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import MAX_GRADE, MIN_GRADE, ParentStudentLink, Role, User
+from .models import (
+    E164_VALIDATOR,
+    MAX_GRADE,
+    MIN_GRADE,
+    ParentStudentLink,
+    Role,
+    User,
+)
 
 GRADE_CHOICES = [("", "Choose a grade")] + [
     (str(grade), f"Grade {grade}") for grade in range(MIN_GRADE, MAX_GRADE + 1)
@@ -32,6 +39,14 @@ class RegistrationForm(UserCreationForm):
         label="Grade",
         help_text="Students only. This decides how attendance is taken.",
     )
+    # Required for parents, ignored for everyone else (enforced in clean()).
+    # This is where a WhatsApp notification will be sent, so the format is
+    # checked now rather than discovered when a send fails later.
+    phone_number = forms.CharField(
+        required=False,
+        label="WhatsApp number",
+        help_text="Parents only. International format, e.g. +27821234567.",
+    )
     child_username = forms.CharField(
         required=False,
         label="Your child's username (optional)",
@@ -49,9 +64,18 @@ class RegistrationForm(UserCreationForm):
         grade = self.cleaned_data.get("grade")
         return int(grade) if grade else None
 
+    def clean_phone_number(self):
+        # Normalise (strip spaces) and validate the shape only when one was
+        # given; whether it is *required* depends on the role, decided in clean().
+        raw = (self.cleaned_data.get("phone_number") or "").strip().replace(" ", "")
+        if raw:
+            E164_VALIDATOR(raw)
+        return raw
+
     def clean(self):
         cleaned = super().clean()
         role = cleaned.get("role")
+
         # A student must have a grade; a teacher or parent never does, so any
         # grade they happened to send is discarded rather than stored.
         if role == Role.STUDENT:
@@ -59,6 +83,17 @@ class RegistrationForm(UserCreationForm):
                 self.add_error("grade", "Please choose the student's grade.")
         else:
             cleaned["grade"] = None
+
+        # A parent must give a WhatsApp number; anyone else's is discarded.
+        if role == Role.PARENT:
+            if not cleaned.get("phone_number"):
+                self.add_error(
+                    "phone_number",
+                    "A WhatsApp number is required so we can send you updates.",
+                )
+        else:
+            cleaned["phone_number"] = ""
+
         return cleaned
 
     def clean_child_username(self):
@@ -88,6 +123,9 @@ class RegistrationForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.grade = self.cleaned_data.get("grade")
+        # Store None rather than "" when unset, so "has a number" is a single
+        # clean check everywhere.
+        user.phone_number = self.cleaned_data.get("phone_number") or None
 
         if commit:
             user.save()

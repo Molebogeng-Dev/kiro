@@ -165,7 +165,7 @@ cmd_all() {
 # sprint that owns it. The mapping of test modules to sprints lives here, in one
 # readable place; each module below belongs to exactly one sprint.
 
-LATEST_SPRINT=5
+LATEST_SPRINT=6
 
 sprint_labels() {
     case "$1" in
@@ -174,6 +174,7 @@ sprint_labels() {
         3) echo "marking.tests.test_teacher_portal marking.tests.test_transcription classroom.tests.test_views classroom.tests.test_transcription" ;;
         4) echo "classroom.tests.test_student_portal marking.tests.test_student_results" ;;
         5) echo "attendance" ;;
+        6) echo "notifications core.tests_parent_portal" ;;
         *) return 1 ;;
     esac
 }
@@ -185,6 +186,7 @@ sprint_title() {
         3) echo "Teacher portal" ;;
         4) echo "Student portal" ;;
         5) echo "Attendance (grade-based)" ;;
+        6) echo "Parent portal & WhatsApp notifications" ;;
         *) echo "Sprint $1" ;;
     esac
 }

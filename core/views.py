@@ -8,16 +8,20 @@ still placeholders, filled in by Sprints 4 and 6.
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.models import Role
 from accounts.permissions import role_required
+from attendance.models import Attendance
 from classroom.models import Assignment, StudyMaterial
 from marking.models import Memorandum, Paper
 
 # Enough to show the work is happening, few enough that the actions stay visible
 # without scrolling on a laptop.
 RECENT_PAPER_COUNT = 5
+
+# Attendance rows shown on a child's parent page.
+RECENT_ATTENDANCE_DAYS = 10
 
 
 @login_required
@@ -87,4 +91,78 @@ def student_dashboard(request):
 
 @role_required(Role.PARENT)
 def parent_dashboard(request):
-    return render(request, "core/dashboard_parent.html", {"nav_active": "dashboard"})
+    """List the parent's linked children.
+
+    With exactly one child, skip the picker and go straight to their page —
+    most parents have one learner and should not have to click through a list
+    of one. With several, or none, render the dashboard.
+    """
+    children = list(request.user.children)
+    if len(children) == 1:
+        return redirect("core:parent_child", child_id=children[0].id)
+
+    return render(
+        request,
+        "core/dashboard_parent.html",
+        {"children": children, "nav_active": "dashboard"},
+    )
+
+
+@role_required(Role.PARENT)
+def parent_child(request, child_id):
+    """One linked child's recent marked papers and attendance.
+
+    Access is via the parent/student link: ``request.user.children`` is the
+    queryset of linked learners, so a child_id that is not linked is excluded
+    before the lookup and returns 404 — the same ownership boundary as the
+    student portal, never a "you may not" page that confirms the child exists.
+    """
+    child = get_object_or_404(request.user.children, id=child_id)
+
+    recent_papers = (
+        Paper.objects.filter(student=child, status=Paper.Status.MARKED)
+        .select_related("memorandum", "assignment", "result")
+        .order_by("-created_at")[:RECENT_PAPER_COUNT]
+    )
+    recent_attendance = Attendance.objects.filter(student=child).order_by("-date")[
+        :RECENT_ATTENDANCE_DAYS
+    ]
+
+    return render(
+        request,
+        "core/parent_child.html",
+        {
+            "child": child,
+            # For a switcher when a parent has more than one child.
+            "children": request.user.children,
+            "recent_papers": recent_papers,
+            "recent_attendance": recent_attendance,
+            "nav_active": "dashboard",
+        },
+    )
+
+
+@role_required(Role.PARENT)
+def parent_paper(request, pk):
+    """A marked paper of one of the parent's children, read-only.
+
+    Reuses the same ``marking/_result_body.html`` the teacher and student see.
+    Restricted to ``status="marked"`` papers of linked children, filtered before
+    the lookup, so another family's paper (or an unmarked one) is a 404.
+    """
+    paper = get_object_or_404(
+        Paper.objects.select_related("memorandum", "assignment", "student", "result"),
+        pk=pk,
+        status=Paper.Status.MARKED,
+        student__in=request.user.children,
+    )
+
+    return render(
+        request,
+        "core/parent_paper.html",
+        {
+            "paper": paper,
+            "questions": paper.result.questions.all(),
+            "nav_active": "dashboard",
+        },
+    )

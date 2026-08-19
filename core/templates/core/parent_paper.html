@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}{{ paper.belongs_to_display }}'s result &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{% if paper.assignment %}{{ paper.assignment.title }}{% else %}{{ paper.memorandum.title }}{% endif %}</h1>
+    <p class="page-head__lead">
+      {{ paper.belongs_to_display }} &middot; marked {{ paper.created_at|date:"j F Y, H:i" }}
+    </p>
+  </div>
+
+  {% comment %}
+  Read-only reuse of the shared result partial. Only marked papers reach this
+  view, and the partial's marked branch has no teacher/student actions in it —
+  so no retry, alt-action, or fork is needed; only the back link is supplied.
+  {% endcomment %}
+  {% url 'core:parent_child' paper.student_id as back_url %}
+  {% include "marking/_result_body.html" with back_url=back_url back_label="Back to marked work" %}
+{% endblock %}

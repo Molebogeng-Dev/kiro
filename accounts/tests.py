@@ -103,6 +103,8 @@ class RegistrationTests(TestCase):
             # Required for students since Sprint 5; harmless for other roles,
             # where the form discards it.
             "grade": "8",
+            # Required for parents since Sprint 6; discarded for other roles.
+            "phone_number": "+27821234567",
             "password1": PASSWORD,
             "password2": PASSWORD,
         }
@@ -205,13 +207,18 @@ class ParentStudentLinkTests(TestCase):
                 "username": "guardian",
                 "email": "guardian@example.com",
                 "role": Role.PARENT.value,
+                "phone_number": "+27821234567",
                 "password1": PASSWORD,
                 "password2": PASSWORD,
                 "child_username": "learner",
             },
             follow=True,
         )
-        self.assertEqual(response.redirect_chain[-1][0], "/parent/")
+        # A parent with exactly one linked child lands straight on that child's
+        # page rather than a picker of one (Sprint 6 behaviour).
+        self.assertEqual(
+            response.redirect_chain[-1][0], f"/parent/child/{self.student.id}/"
+        )
 
         guardian = User.objects.get(username="guardian")
         self.assertEqual(list(guardian.children), [self.student])

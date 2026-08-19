@@ -44,6 +44,20 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
   Revisit during the security and hardening pass, along with
   `manage.py check --deploy`, HSTS, and secure cookie settings.
 
+  - **Twilio sandbox requires manual recipient opt-in.**
+   Each phone number must join the sandbox (sending a join code via WhatsApp) before it can receive messages. This is an operational step for demo day, not something the code handles or can automate.
+
+  - **WhatsApp notification is a hackathon-scale demonstration, not a production channel.** 
+  The sandbox setup requires each recipient to
+  manually opt in and does not scale to real parents. A production
+  rollout would need Meta's WhatsApp Business Platform with business
+  verification (a real approval process, out of scope for this
+  timeline) and would incur a small per-message cost — cheap
+  (roughly $0.0014/message) but not free. In-app notification, already
+  built into the parent portal, is the actual $0 production channel;
+  WhatsApp becomes an enhancement layered on top once verification is
+  complete, not a dependency.
+
 ## Tech stack
 
 - Django + Django REST Framework
@@ -130,6 +144,10 @@ exactly the kind of bug that's easy to miss until a demo.
 | `MARKING_IMAGE_MAX_DIMENSION` | no | Longest edge after compression. Defaults to `1600`. |
 | `MARKING_IMAGE_JPEG_QUALITY` | no | Defaults to `80`. |
 | `MARKING_MAX_UPLOAD_BYTES` | no | Rejected above this before processing. Defaults to 15 MB. |
+| `TWILIO_ACCOUNT_SID` | no | Twilio WhatsApp sandbox. Without it, a notification is recorded as `failed` and marking is unaffected. |
+| `TWILIO_AUTH_TOKEN` | no | Paired with the SID above. |
+| `TWILIO_WHATSAPP_FROM` | no | Sandbox sender, e.g. `+14155238886` (the `whatsapp:` prefix is added if absent). |
+| `TWILIO_TIMEOUT` | no | Seconds to bound the outbound send. Defaults to `15`. |
 
 The `service_role` key bypasses row-level security. It stays server-side, is
 never rendered into a template, and belongs in `.env` only.
@@ -392,6 +410,67 @@ stays silent about passing tests and names only the ones that fail, error, or
 are skipped — with full tracebacks and a count summary underneath, the way
 pytest's short summary reads. `./run.sh test`, `test-pg`, and `ci` keep Django's
 default output.
+
+## The parent portal
+
+`core/` holds the parent-facing pages (Sprint 6). A parent sees the children
+linked to them, and for a chosen child the same marked work and attendance the
+teacher and student already see — read-only, and reusing the existing displays
+rather than a parent-only fork.
+
+| Page | Path |
+| --- | --- |
+| My children | `/parent/` |
+| One child's work and attendance | `/parent/child/<id>/` |
+| One marked paper | `/parent/paper/<id>/` |
+
+The access boundary is the whole point of the sprint. A parent can only reach a
+child they are linked to through `ParentStudentLink`: the child list is
+`request.user.children`, and a child id that is not in it is filtered out
+*before* the lookup, so another family's child (or their paper) is a 404, never
+a page that confirms the record exists — the same ownership pattern as the
+student portal. Every page rejects non-parent roles at the view.
+
+Two conveniences: a parent with exactly one linked child skips the picker and
+lands straight on that child's page, and a marked paper reuses the shared
+`marking/_result_body.html` partial, so a result looks identical to whoever is
+entitled to see it. Attendance reuses the Sprint 5 `Attendance` rollup untouched.
+
+`ParentStudentLink` itself is unchanged — still self-declared and unverified at
+registration, which stays a documented known limitation above.
+
+## Parent notifications
+
+`notifications/` (Sprint 6) tells a parent, in plain language, the moment their
+child's paper is marked. It hangs off the marking engine's existing success
+path, so it fires for a teacher-marked class set and a student's homework alike,
+with no per-flow duplication.
+
+The flow when a `Paper` reaches `status="marked"`:
+
+1. `marking/engine.py` calls `notify_parents_of_marked_paper` once the result is
+   persisted. The call is wrapped and swallows everything — notifying a parent
+   is a separate concern from marking, so a notification problem never changes a
+   paper's status or the teacher/student's view of the result.
+2. `notifications/summary.py` turns the `MarkingResult` into two or three plain
+   sentences via a **text-only** OpenRouter call (no image, so near-free, reusing
+   the same `OPENROUTER_MODEL`). If that call fails for any reason, it falls back
+   to a templated message built from the score alone — `generate_summary` never
+   raises, so a summarisation failure never means no notification.
+3. `notifications/services.py` sends via Twilio's WhatsApp sandbox, best-effort.
+   Twilio is imported lazily and the send is time-bounded (`TWILIO_TIMEOUT`).
+
+Every attempt is recorded as a `Notification` (one row per paper per parent):
+`status="sent"`, or `status="failed"` with the error kept. That single unique
+constraint doubles as the **dedupe guard** — re-marking a paper cannot message
+the same parent twice. Only parents with a stored phone number are contacted; a
+failed marking attempt notifies nobody, because there is nothing to summarise.
+
+The summary and send both add latency to the (synchronous) marking request;
+moving notification to a background worker is the natural next step, flagged for
+after the MVP. New env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+`TWILIO_WHATSAPP_FROM` (all optional — with none set, a notification is simply
+recorded as `failed` and marking is unaffected).
 
 ## Continuous integration
 

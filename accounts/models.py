@@ -8,8 +8,20 @@ authorisation (which dashboards you are refused).
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import (
+    MaxValueValidator,
+    MinValueValidator,
+    RegexValidator,
+)
 from django.db import models
+
+# E.164: a leading +, a non-zero country-code digit, then up to 14 more digits.
+# This is the shape WhatsApp/Twilio expect, so validating it at the door means a
+# bad number is caught at registration, not when a notification silently fails.
+E164_VALIDATOR = RegexValidator(
+    regex=r"^\+[1-9]\d{7,14}$",
+    message="Enter a phone number in international format, for example +27821234567.",
+)
 
 
 class Role(models.TextChoices):
@@ -69,6 +81,18 @@ class User(AbstractUser):
         help_text="1 to 12. Only set for students.",
     )
 
+    # Only meaningful for parents; null for teachers and students. Required at
+    # parent registration by the form, not the database (same pattern as grade),
+    # and stored in E.164 so it is ready to become a WhatsApp address without
+    # reformatting. Notifications only ever go to a parent whose number is set.
+    phone_number = models.CharField(
+        max_length=16,
+        null=True,
+        blank=True,
+        validators=[E164_VALIDATOR],
+        help_text="International format, e.g. +27821234567. Only set for parents.",
+    )
+
     # Placeholder link to the stub School model. The real school/class
     # structure lands in a later sprint.
     school = models.ForeignKey(
@@ -124,6 +148,11 @@ class User(AbstractUser):
     def dashboard_url_name(self) -> str | None:
         """URL name of this user's dashboard, or None if the role is unset."""
         return ROLE_DASHBOARD_URL_NAMES.get(self.role)
+
+    @property
+    def whatsapp_address(self) -> str | None:
+        """This user's number as a Twilio WhatsApp address, or None."""
+        return f"whatsapp:{self.phone_number}" if self.phone_number else None
 
     @property
     def parents(self):

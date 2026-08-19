@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}{{ child.get_full_name|default:child.username }} &middot; iSgela{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>{{ child.get_full_name|default:child.username }}</h1>
+    <p class="page-head__lead">Grade {{ child.grade|default:"—" }} &middot; marked work and attendance.</p>
+  </div>
+
+  {% if children|length > 1 %}
+    <nav class="button-row" aria-label="Choose a child" style="margin-bottom:1.5rem">
+      {% for other in children %}
+        <a class="button {% if other.id == child.id %}{% else %}button--secondary{% endif %}"
+           href="{% url 'core:parent_child' other.id %}"
+           {% if other.id == child.id %}aria-current="page"{% endif %}>
+          {{ other.get_full_name|default:other.username }}
+        </a>
+      {% endfor %}
+    </nav>
+  {% endif %}
+
+  <h2>Recent marked work</h2>
+  {% if recent_papers %}
+    <ul class="record-list">
+      {% for paper in recent_papers %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">
+              {% if paper.assignment %}{{ paper.assignment.title }}{% else %}{{ paper.memorandum.title }}{% endif %}
+            </p>
+            <p class="record__meta">Marked {{ paper.created_at|date:"j M Y" }}</p>
+          </div>
+          <div class="record__aside">
+            <span class="record__score tabular">
+              {{ paper.result.marks_awarded|floatformat }}/{{ paper.result.marks_available|floatformat }}
+            </span>
+            {% if paper.result.percentage is not None %}
+              <span class="muted tabular">{{ paper.result.percentage|floatformat:0 }}%</span>
+            {% endif %}
+            <a class="button button--secondary" href="{% url 'core:parent_paper' paper.id %}">See feedback</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No marked work yet</h3>
+      <p class="empty__body">When your child's work is marked, it appears here.</p>
+    </div>
+  {% endif %}
+
+  <h2 style="margin-top:2rem">Recent attendance</h2>
+  {% if recent_attendance %}
+    <ul class="record-list">
+      {% for record in recent_attendance %}
+        <li class="record">
+          <div class="record__main">
+            <p class="record__title">{{ record.date|date:"l j F Y" }}</p>
+            <p class="record__meta">
+              {% if record.arrived_at %}in {{ record.arrived_at|time:"H:i" }}{% endif %}
+              {% if record.departed_at %} &middot; out {{ record.departed_at|time:"H:i" }}{% endif %}
+              {% if not record.arrived_at %}present{% endif %}
+            </p>
+          </div>
+          <div class="record__aside">
+            {% if record.method == 'facial' %}
+              <span class="badge badge--marked">Facial</span>
+            {% else %}
+              <span class="badge badge--neutral">Roll-call</span>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">
+      <h3 class="empty__title">No attendance recorded yet</h3>
+      <p class="empty__body">Days your child is marked present will appear here.</p>
+    </div>
+  {% endif %}
+
+  <p style="margin-top:1.5rem">
+    <a href="{% url 'core:parent_dashboard' %}">&larr; Back to my children</a>
+  </p>
+{% endblock %}

@@ -66,7 +66,11 @@ class GradeAtRegistrationTests(TestCase):
         self.assertIsNone(teacher.grade)
 
     def test_grade_is_ignored_for_a_parent(self):
-        self.register("parent-acct", "parent", grade="8")
+        # A parent registration requires a phone number (Sprint 6); supply one
+        # so the account is created and the grade-ignoring is what's exercised.
+        self.register(
+            "parent-acct", "parent", grade="8", phone_number="+27821234567"
+        )
 
         self.assertIsNone(User.objects.get(username="parent-acct").grade)
 

@@ -111,17 +111,7 @@ class OpenRouterClient:
     # -- public API -------------------------------------------------------- #
 
     def complete_with_image(self, *, system_prompt, user_prompt, image_bytes, mime_type="image/jpeg"):
-        """Send a prompt plus one image and return the assistant's reply.
-
-        Each configured model is tried in turn. A rate limit or an unavailable
-        slug moves on to the next one; if every model is rate limited, the rate
-        limit is what surfaces, because that is the actionable fact.
-        """
-        if not self.api_key:
-            raise OpenRouterNotConfigured(
-                "OPENROUTER_API_KEY is not set. Add it to .env before marking."
-            )
-
+        """Send a prompt plus one image and return the assistant's reply."""
         messages = [
             {"role": "system", "content": system_prompt},
             {
@@ -135,6 +125,34 @@ class OpenRouterClient:
                 ],
             },
         ]
+        return self._complete(messages)
+
+    def complete_text(self, *, system_prompt, user_prompt):
+        """Send a text-only prompt and return the assistant's reply.
+
+        Used for the parent-notification summary (Sprint 6): no image, so the
+        call is near-free. Shares the same model-fallback and error handling as
+        the marking call.
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        return self._complete(messages)
+
+    # -- internals --------------------------------------------------------- #
+
+    def _complete(self, messages):
+        """Try each configured model in turn until one answers.
+
+        A rate limit or an unavailable slug moves on to the next model; if every
+        model is rate limited, the rate limit is what surfaces, because that is
+        the actionable fact.
+        """
+        if not self.api_key:
+            raise OpenRouterNotConfigured(
+                "OPENROUTER_API_KEY is not set. Add it to .env."
+            )
 
         rate_limit_error = None
         last_error = None
@@ -153,8 +171,6 @@ class OpenRouterClient:
         if rate_limit_error is not None:
             raise rate_limit_error
         raise last_error
-
-    # -- internals --------------------------------------------------------- #
 
     @staticmethod
     def _data_uri(image_bytes, mime_type):

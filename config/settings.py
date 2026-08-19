@@ -66,6 +66,8 @@ LOCAL_APPS = [
     "classroom",
     # Grade-based attendance: manual roll-call and facial check-in.
     "attendance",
+    # Parent WhatsApp notifications when a paper is marked.
+    "notifications",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
@@ -164,6 +166,11 @@ if RUNNING_TESTS:
         "loggers": {
             "marking": {"handlers": ["null"], "level": "WARNING", "propagate": False},
             "core": {"handlers": ["null"], "level": "WARNING", "propagate": False},
+            "notifications": {
+                "handlers": ["null"],
+                "level": "WARNING",
+                "propagate": False,
+            },
         },
     }
 
@@ -335,3 +342,20 @@ FACEAPI_MODEL_URL = config(
     "FACEAPI_MODEL_URL",
     default="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model",
 )
+
+
+# --------------------------------------------------------------------------- #
+# Parent notifications (Twilio WhatsApp)
+# --------------------------------------------------------------------------- #
+
+# Twilio's WhatsApp sandbox. All optional: with none of them set, notification
+# sending fails gracefully and is recorded as a failed Notification — it never
+# affects a paper's marked status or the teacher/student view of the result.
+TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", default="")
+TWILIO_AUTH_TOKEN = config("TWILIO_AUTH_TOKEN", default="")
+# The sandbox sender, e.g. +14155238886 (the whatsapp: prefix is added if absent).
+TWILIO_WHATSAPP_FROM = config("TWILIO_WHATSAPP_FROM", default="")
+
+# Bound the outbound send so a slow Twilio call cannot stretch the (already
+# synchronous) marking request much further.
+TWILIO_TIMEOUT = config("TWILIO_TIMEOUT", default=15, cast=int)

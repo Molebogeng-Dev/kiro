@@ -88,10 +88,35 @@ def mark_paper(paper, *, image_bytes=None, client=None) -> MarkingResult:
             user_prompt = build_retry_prompt(memorandum, exc)
             continue
 
-        return _persist(paper, parsed, completion)
+        result = _persist(paper, parsed, completion)
+        _notify_parents(paper)
+        return result
 
     paper.record_failure(Paper.FailureKind.INVALID_RESPONSE, last_parse_error)
     raise last_parse_error
+
+
+def _notify_parents(paper):
+    """Tell the student's parents their paper was marked, best-effort.
+
+    Deliberately swallows everything. Notifying a parent is a separate concern
+    from marking: the paper is already saved as ``marked`` by the time we get
+    here, and the teacher and student can see their result. A notification
+    problem — a missing dependency, a provider outage, a bug in the summary —
+    must never turn a successful mark into a failure or raise into the caller.
+
+    Imported lazily so the marking engine carries no hard dependency on the
+    notifications app or on Twilio.
+    """
+    try:
+        from notifications.services import notify_parents_of_marked_paper
+
+        notify_parents_of_marked_paper(paper)
+    except Exception:  # noqa: BLE001 - marking must not fail on a notification.
+        logger.exception(
+            "Notifying parents about marked paper %s failed; the mark stands.",
+            paper.pk,
+        )
 
 
 def _read_image(paper):
