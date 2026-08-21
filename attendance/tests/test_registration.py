@@ -4,29 +4,42 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
+from core.models import School, TeacherInvite
 
 PASSWORD = "an-oddly-specific-passphrase-42"
 
 
-def register_payload(username, role, **extra):
-    payload = {
-        "username": username,
-        "first_name": "Test",
-        "last_name": "Person",
-        "email": f"{username}@example.com",
-        "role": role,
-        "password1": PASSWORD,
-        "password2": PASSWORD,
-    }
-    payload.update(extra)
-    return payload
-
-
 class GradeAtRegistrationTests(TestCase):
-    def register(self, username, role, **extra):
-        return self.client.post(
-            reverse("accounts:register"), register_payload(username, role, **extra)
+    def setUp(self):
+        # Registration now joins a school with a code (Sprint 8a); supply valid
+        # ones so these tests still isolate the grade behaviour they check.
+        self.school = School.objects.create(
+            name="Attendance Test School", min_grade=1, max_grade=12
         )
+
+    def _code_for(self, role):
+        if role == "teacher":
+            return TeacherInvite.create_for(
+                school=self.school, teacher_name="T", assigned_grades="8"
+            ).code
+        if role == "parent":
+            return self.school.parent_student_join_code
+        return self.school.student_join_code
+
+    def register(self, username, role, **extra):
+        payload = {
+            "username": username,
+            "first_name": "Test",
+            "last_name": "Person",
+            "email": f"{username}@example.com",
+            "role": role,
+            "school": self.school.id,
+            "code": self._code_for(role),
+            "password1": PASSWORD,
+            "password2": PASSWORD,
+        }
+        payload.update(extra)
+        return self.client.post(reverse("accounts:register"), payload)
 
     def test_a_student_must_supply_a_grade(self):
         response = self.register("gradeless", "student")

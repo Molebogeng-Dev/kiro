@@ -12,9 +12,23 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 
 from accounts.models import Role, User
+from core.models import School
 from marking.models import Memorandum
 
 PASSWORD = "marking-tests-passphrase-77"
+
+
+def default_school():
+    """A shared school so a teacher and the learners they mark are co-located.
+
+    Since Sprint 8b scopes the student picker to the teacher's school, users
+    built by these helpers default to one school unless a test says otherwise;
+    cross-school tests pass an explicit ``school``.
+    """
+    school, _ = School.objects.get_or_create(
+        name="Marking Test School", defaults={"min_grade": 1, "max_grade": 12}
+    )
+    return school
 
 MEMORANDUM_TEXT = """Question 1.1 (2 marks)
 Expected: 12
@@ -53,6 +67,9 @@ def valid_marking_json(**overrides) -> str:
 
 
 def make_user(username, role=Role.TEACHER, **extra):
+    # Co-locate everyone in one school by default (Sprint 8b scoping); a test
+    # that cares about cross-school isolation passes its own ``school``.
+    extra.setdefault("school", default_school())
     return User.objects.create_user(
         username=username,
         email=f"{username}@example.com",

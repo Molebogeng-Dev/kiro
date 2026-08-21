@@ -10,6 +10,8 @@ from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
+from core.models import School, TeacherInvite
+
 from .models import ParentStudentLink, Role, User
 
 DASHBOARD_PATHS = {
@@ -91,20 +93,42 @@ class HomeRoutingTests(TestCase):
 class RegistrationTests(TestCase):
     """Registration works for all three roles and lands on the right dashboard."""
 
+    def setUp(self):
+        # Every self-registration now joins a school with a code (Sprint 8a).
+        self.school = School.objects.create(
+            name="Registration Test School", min_grade=1, max_grade=12
+        )
+
+    def _code_for(self, role_value):
+        """The right registration code for a role at ``self.school``."""
+        if role_value == Role.TEACHER.value:
+            return TeacherInvite.create_for(
+                school=self.school, teacher_name="Listed Teacher", assigned_grades="8"
+            ).code
+        if role_value == Role.PARENT.value:
+            return self.school.parent_student_join_code
+        # Students and any role the form should reject fall back to the student
+        # code; a rejected role errors on the role field regardless of the code.
+        return self.school.student_join_code
+
     def register(self, username, role, follow=False, **extra):
         """POST the registration form. ``role`` may be a Role or a raw string,
         so a test can send something the form should reject."""
+        role_value = getattr(role, "value", role)
         payload = {
             "username": username,
             "first_name": "Test",
             "last_name": "Person",
             "email": f"{username}@example.com",
-            "role": getattr(role, "value", role),
+            "role": role_value,
             # Required for students since Sprint 5; harmless for other roles,
             # where the form discards it.
             "grade": "8",
             # Required for parents since Sprint 6; discarded for other roles.
             "phone_number": "+27821234567",
+            # School + code required since Sprint 8a.
+            "school": self.school.id,
+            "code": self._code_for(role_value),
             "password1": PASSWORD,
             "password2": PASSWORD,
         }
@@ -172,6 +196,7 @@ class ParentStudentLinkTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        cls.school = School.objects.create(name="Link Test School")
         cls.student = make_user("learner", Role.STUDENT)
         cls.mother = make_user("mother", Role.PARENT)
         cls.father = make_user("father", Role.PARENT)
@@ -208,6 +233,8 @@ class ParentStudentLinkTests(TestCase):
                 "email": "guardian@example.com",
                 "role": Role.PARENT.value,
                 "phone_number": "+27821234567",
+                "school": self.school.id,
+                "code": self.school.parent_student_join_code,
                 "password1": PASSWORD,
                 "password2": PASSWORD,
                 "child_username": "learner",

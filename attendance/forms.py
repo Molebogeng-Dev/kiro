@@ -16,6 +16,7 @@ from accounts.models import (
     Role,
     User,
 )
+from accounts.scoping import scope_by_school
 
 from .matching import InvalidDescriptor, parse_descriptor
 
@@ -28,23 +29,27 @@ class StudentChoiceField(forms.ModelChoiceField):
         return f"{name} — Grade {student.grade}"
 
 
-def primary_students():
-    return User.objects.filter(
+def primary_students(school):
+    """Primary-band learners (grades 1-7) at ``school``. Empty if school None."""
+    qs = User.objects.filter(
         role=Role.STUDENT, grade__lte=PRIMARY_GRADE_MAX
     ).order_by("grade", "first_name", "last_name", "username")
+    return scope_by_school(qs, school)
 
 
-def secondary_students():
-    return User.objects.filter(
+def secondary_students(school):
+    """Secondary-band learners (grades 8-12) at ``school``. Empty if school None."""
+    qs = User.objects.filter(
         role=Role.STUDENT, grade__gte=SECONDARY_GRADE_MIN
     ).order_by("grade", "first_name", "last_name", "username")
+    return scope_by_school(qs, school)
 
 
 class FaceEnrollmentForm(forms.Form):
     """Enroll a secondary student's face, with consent, storing only a vector."""
 
     student = StudentChoiceField(
-        queryset=secondary_students(),
+        queryset=User.objects.none(),
         empty_label="Choose a student",
         label="Which student?",
         help_text="Only grades 8 to 12 use facial check-in.",
@@ -60,11 +65,12 @@ class FaceEnrollmentForm(forms.Form):
     # descriptor. The photo itself never leaves the browser.
     descriptor = forms.CharField(widget=forms.HiddenInput)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, school=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # Re-evaluate per request so a student who registered moments ago is
-        # already selectable.
-        self.fields["student"].queryset = secondary_students()
+        # Re-evaluate per request (and scope to the teacher's school) so a
+        # student who registered moments ago is selectable, and one at another
+        # school never is.
+        self.fields["student"].queryset = secondary_students(school)
 
     def clean_descriptor(self):
         raw = self.cleaned_data.get("descriptor", "").strip()
@@ -84,12 +90,12 @@ class FallbackMarkForm(forms.Form):
     """The manual fallback when a secondary student's face will not match."""
 
     student = StudentChoiceField(
-        queryset=secondary_students(),
+        queryset=User.objects.none(),
         empty_label="Choose a student",
         label="Mark present by hand",
         help_text="Use this only when the camera cannot recognise the student.",
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, school=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["student"].queryset = secondary_students()
+        self.fields["student"].queryset = secondary_students(school)

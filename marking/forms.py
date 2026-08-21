@@ -2,14 +2,21 @@
 
 from django import forms
 
-from accounts.models import Role, User
+from accounts.models import User
+from accounts.scoping import students_at_school
 
 from .models import Memorandum
 
 
-def student_queryset():
-    """Every learner, ordered by the name a teacher would look for."""
-    return User.objects.filter(role=Role.STUDENT).order_by(
+def student_queryset(school):
+    """Learners at ``school``, ordered by the name a teacher would look for.
+
+    Scoped to the teacher's school (Sprint 8b): the picker only lists their own
+    school's learners, and because a ModelChoiceField validates the submitted id
+    against this queryset, a tampered cross-school id is rejected on POST too.
+    Empty when the teacher has no school.
+    """
+    return students_at_school(school).order_by(
         "first_name", "last_name", "username"
     )
 
@@ -63,9 +70,12 @@ class TeacherMarkPaperForm(PaperUploadForm):
 
     def __init__(self, *args, teacher=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # Evaluated per request, so a learner who registered a minute ago is
-        # already selectable.
-        self.fields["student"].queryset = student_queryset()
+        # Evaluated per request and scoped to the teacher's school, so a learner
+        # who registered a minute ago is selectable and one at another school
+        # never is.
+        self.fields["student"].queryset = student_queryset(
+            teacher.school if teacher is not None else None
+        )
         # A teacher marks against their own memorandums. Ownership is the only
         # boundary the MVP has, and it keeps this consistent with the memorandum
         # list, which is already per-teacher.

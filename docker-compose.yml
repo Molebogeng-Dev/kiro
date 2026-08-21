@@ -1,0 +1,40 @@
+# iSgela — single-container demo stack.
+#
+# There is deliberately no database service here: iSgela runs against Supabase
+# Postgres (an external managed database), configured through DATABASE_URL in
+# .env. This compose file builds the app image from the existing Dockerfile and
+# runs it, reading all configuration from .env.
+#
+# Usage is wrapped in ./docker.sh (build, up, logs, down); this file is what it
+# drives. Compose auto-loads .env from this directory for ${VAR} substitution,
+# and env_file passes the same values into the container.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: isgela:latest
+    # Secrets are mounted, not passed through env_file. The app reads .env
+    # directly via python-decouple, so mounting the file read-only gets the
+    # values to it verbatim — whereas Compose's env_file interpolation would try
+    # to expand a literal "$" inside a secret (our SECRET_KEY has one, and a DB
+    # password could) and silently mangle it. The file is never baked into the
+    # image (.dockerignore excludes it from the build context).
+    volumes:
+      - ./.env:/app/.env:ro
+    environment:
+      # A single demo container is one replica, so applying migrations and
+      # ensuring the storage bucket on start is safe and convenient. Override to
+      # "0" if you manage those out of band. (These are the opt-in flags the
+      # entrypoint reads.)
+      RUN_MIGRATIONS_ON_START: "${RUN_MIGRATIONS_ON_START:-1}"
+      ENSURE_STORAGE_BUCKET_ON_START: "${ENSURE_STORAGE_BUCKET_ON_START:-1}"
+      # Host allowlist for the browser. Defaults suit localhost; override in .env
+      # (or the shell) when serving under a real hostname.
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1}"
+      PORT: "8000"
+    ports:
+      # host:container. Change the host side with HOST_PORT=9000 ./docker.sh up.
+      - "${HOST_PORT:-8000}:8000"
+    restart: unless-stopped

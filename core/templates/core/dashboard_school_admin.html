@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}School dashboard &middot; iSgela{% endblock %}
+
+{% block content %}
+  {% if school %}
+    <div class="page-head">
+      <h1>{{ school.name }}</h1>
+      <p class="page-head__lead">{{ school.grade_range_label }}</p>
+    </div>
+
+    <h2>Join codes</h2>
+    <p class="muted">
+      Share these with the people joining your school. They stay the same and
+      can be reused by everyone — they are not used up.
+    </p>
+    <dl class="detail-grid">
+      <div>
+        <dt>Students</dt>
+        <dd><code class="join-code">{{ school.student_join_code }}</code></dd>
+      </div>
+      <div>
+        <dt>Parents</dt>
+        <dd><code class="join-code">{{ school.parent_student_join_code }}</code></dd>
+      </div>
+    </dl>
+
+    <h2 style="margin-top:2rem">Teachers</h2>
+    <p class="muted">
+      List a teacher to generate a single-use code they enter when they
+      register. This reserves their slot; it does not create their account.
+    </p>
+
+    <div class="panel">
+      <form method="post" class="form" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <ul class="form__errors" role="alert">
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+        {% for field in form %}
+          {% include "partials/field.html" with field=field %}
+        {% endfor %}
+        <div class="form__actions">
+          <button type="submit" class="button">List teacher</button>
+        </div>
+      </form>
+    </div>
+
+    {% if invites %}
+      <ul class="summary-row" style="margin-top:1.5rem">
+        <li><strong>{{ invites|length }}</strong> teacher{{ invites|length|pluralize }} listed</li>
+        <li><strong>{{ open_invite_count }}</strong> code{{ open_invite_count|pluralize }} not yet used</li>
+      </ul>
+
+      <ul class="record-list">
+        {% for invite in invites %}
+          <li class="record">
+            <div class="record__main">
+              <p class="record__title">{{ invite.teacher_name }}</p>
+              <p class="record__meta">{{ invite.assigned_grades }}</p>
+              <p class="record__meta">Code: <code class="join-code">{{ invite.code }}</code></p>
+            </div>
+            <div class="record__aside">
+              {% if invite.is_claimed %}
+                <span class="badge badge--marked">Claimed</span>
+              {% else %}
+                <span class="badge badge--neutral">Not used yet</span>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty">
+        <h3 class="empty__title">No teachers listed yet</h3>
+        <p class="empty__body">Add your first teacher above to generate their code.</p>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="page-head">
+      <h1>School dashboard</h1>
+    </div>
+    <div class="empty">
+      <h3 class="empty__title">No school linked to this account</h3>
+      <p class="empty__body">
+        This admin account is not linked to a school. Register a school to get
+        started, or contact support.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

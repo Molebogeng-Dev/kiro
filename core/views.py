@@ -6,12 +6,14 @@ working rather than just linking elsewhere. The student and parent dashboards ar
 still placeholders, filled in by Sprints 4 and 6.
 """
 
-from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
-from accounts.models import Role, User
+from accounts.forms import TeacherInviteForm
+from accounts.models import Role
 from accounts.permissions import role_required
+from accounts.scoping import scope_by_school, students_at_school
 from attendance.models import Attendance
 from classroom.models import Assignment, StudyMaterial
 from marking.models import Memorandum, Paper
@@ -26,9 +28,17 @@ RECENT_PAPER_COUNT = 5
 RECENT_ATTENDANCE_DAYS = 10
 
 
-@login_required
 def home(request):
-    """Send a logged-in user to the dashboard for their role."""
+    """The app's front door.
+
+    An anonymous visitor gets the public landing page that introduces iSgela.
+    A signed-in user is sent straight to their role's dashboard, so the app
+    still opens on their own workspace the moment they have an account — the
+    behaviour this view had before the landing page existed.
+    """
+    if not request.user.is_authenticated:
+        return render(request, "core/landing.html", {"nav_active": "home"})
+
     url_name = request.user.dashboard_url_name
     if url_name is None:
         raise PermissionDenied(
@@ -36,6 +46,63 @@ def home(request):
             "one before you can use iSgela."
         )
     return redirect(url_name)
+
+
+def about(request):
+    """The public 'About iSgela' page.
+
+    Holds the longer story the landing page used to carry inline — the problem
+    iSgela solves, what it does, and a way in. It's reachable by anyone, signed
+    in or not, and is linked from the About frame on the landing page.
+    """
+    return render(request, "core/about.html", {"nav_active": "about"})
+
+
+@role_required(Role.SCHOOL_ADMIN)
+def school_admin_dashboard(request):
+    """The school admin's hub: the join codes to share, and the teacher list.
+
+    Listing a teacher creates a single-use ``TeacherInvite`` — a slot, not an
+    account — that the teacher claims when they register. The school is always
+    the admin's own (``request.user.school``), never taken from the request.
+    """
+    school = request.user.school
+    if school is None:
+        # A school_admin created through registration always has a school; this
+        # is only reachable for an oddly-provisioned account, so say so plainly
+        # rather than 500.
+        return render(
+            request,
+            "core/dashboard_school_admin.html",
+            {"school": None, "nav_active": "dashboard"},
+        )
+
+    if request.method == "POST":
+        form = TeacherInviteForm(request.POST, school=school)
+        if form.is_valid():
+            invite = form.save()
+            messages.success(
+                request,
+                f"Listed {invite.teacher_name}. Their single-use code is "
+                f"{invite.code} \u2014 share it with them to register.",
+            )
+            return redirect("core:school_admin_dashboard")
+    else:
+        form = TeacherInviteForm(school=school)
+
+    invites = school.teacher_invites.select_related("claimed_by").all()
+
+    return render(
+        request,
+        "core/dashboard_school_admin.html",
+        {
+            "school": school,
+            "form": form,
+            "invites": invites,
+            "open_invite_count": sum(1 for invite in invites if not invite.is_claimed),
+            "nav_active": "dashboard",
+        },
+    )
 
 
 @role_required(Role.TEACHER)
@@ -72,11 +139,16 @@ def student_dashboard(request):
     )
 
     # Assignments this student has not submitted yet, so the dashboard can nudge
-    # toward the next thing to do rather than just linking around.
+    # toward the next thing to do rather than just linking around. Scoped to the
+    # student's school (Sprint 8b), to match the now school-scoped lists — the
+    # dashboard count must not include another school's assignments.
     submitted_assignment_ids = Paper.objects.filter(
         student=request.user, assignment__isnull=False
     ).values_list("assignment_id", flat=True)
-    to_do_count = Assignment.objects.exclude(id__in=submitted_assignment_ids).count()
+    school_assignments = scope_by_school(
+        Assignment.objects.all(), request.user.school, field="created_by__school"
+    )
+    to_do_count = school_assignments.exclude(id__in=submitted_assignment_ids).count()
 
     return render(
         request,
@@ -84,7 +156,11 @@ def student_dashboard(request):
         {
             "recent_papers": recent_papers,
             "to_do_count": to_do_count,
-            "has_materials": StudyMaterial.objects.exists(),
+            "has_materials": scope_by_school(
+                StudyMaterial.objects.all(),
+                request.user.school,
+                field="created_by__school",
+            ).exists(),
             "first_name": request.user.first_name,
             "nav_active": "dashboard",
         },
@@ -104,8 +180,8 @@ def student_dashboard(request):
 
 @role_required(Role.TEACHER)
 def progress_dashboard(request):
-    """Every learner, each with a transparent rule-based needs-attention flag."""
-    rollups = build_class_overview()
+    """Every learner at this teacher's school, each with a needs-attention flag."""
+    rollups = build_class_overview(request.user.school)
     flagged = [rollup for rollup in rollups if rollup.needs_attention]
     on_track = [rollup for rollup in rollups if not rollup.needs_attention]
 
@@ -126,8 +202,15 @@ def progress_dashboard(request):
 @role_required(Role.TEACHER)
 def progress_student(request, student_id):
     """One learner's rollup: per-subject marks, attendance, assignments, and the
-    reasons behind any flag — so a teacher sees *why*, not just *that*."""
-    student = get_object_or_404(User, id=student_id, role=Role.STUDENT)
+    reasons behind any flag — so a teacher sees *why*, not just *that*.
+
+    Scoped to the acting teacher's school (Sprint 8b): a learner at another
+    school is filtered out before the lookup and 404s, the same ownership-
+    boundary pattern the student and parent portals use.
+    """
+    student = get_object_or_404(
+        students_at_school(request.user.school), id=student_id
+    )
     rollup = build_student_rollup(student)
 
     return render(

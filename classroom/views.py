@@ -14,6 +14,7 @@ from django.views.decorators.http import require_http_methods
 
 from accounts.models import Role
 from accounts.permissions import role_required
+from accounts.scoping import scope_by_school
 from core.images import ImageValidationError
 from marking.models import Memorandum, Paper
 from marking.submissions import submit_for_marking
@@ -161,18 +162,21 @@ def material_create(request):
 # Sprint 4: the student portal
 # --------------------------------------------------------------------------- #
 #
-# Study materials and assignments are visible to every student for now, since
-# there is no class or roster structure yet (the Sprint 3 limitation, carried
-# forward). What is scoped per-student is the submission status and the results:
-# a student sees whether *they* have submitted, and only their own marked work.
+# Study materials and assignments are scoped to the student's school (Sprint 8b):
+# a student sees only what a teacher *at their own school* posted, matched on
+# ``created_by__school``. What was already scoped per-student — submission status
+# and results — is unchanged: a student sees whether *they* submitted, and only
+# their own marked work. A student with no school sees nothing (None-safe filter).
 
 
 @role_required(Role.STUDENT)
 def student_material_list(request):
-    """Every study material a teacher has posted."""
-    materials = StudyMaterial.objects.select_related("created_by").order_by(
-        "-created_at"
-    )
+    """Study material posted by a teacher at this student's school."""
+    materials = scope_by_school(
+        StudyMaterial.objects.select_related("created_by"),
+        request.user.school,
+        field="created_by__school",
+    ).order_by("-created_at")
     return render(
         request,
         "classroom/student_material_list.html",
@@ -182,9 +186,14 @@ def student_material_list(request):
 
 @role_required(Role.STUDENT)
 def student_material_detail(request, pk):
-    """One study material to read."""
+    """One study material to read — only if posted at this student's school."""
     material = get_object_or_404(
-        StudyMaterial.objects.select_related("created_by"), pk=pk
+        scope_by_school(
+            StudyMaterial.objects.select_related("created_by"),
+            request.user.school,
+            field="created_by__school",
+        ),
+        pk=pk,
     )
     return render(
         request,
@@ -195,15 +204,17 @@ def student_material_detail(request, pk):
 
 @role_required(Role.STUDENT)
 def student_assignment_list(request):
-    """Assignments, each flagged with whether this student has submitted.
+    """This school's assignments, each flagged with whether the student submitted.
 
     The submission status is computed from one query rather than one per
     assignment: fetch the student's latest paper per assignment up front and
     attach it, so a long list is still a couple of queries.
     """
-    assignments = Assignment.objects.select_related("memorandum").order_by(
-        "-created_at"
-    )
+    assignments = scope_by_school(
+        Assignment.objects.select_related("memorandum"),
+        request.user.school,
+        field="created_by__school",
+    ).order_by("-created_at")
 
     # assignment_id -> the student's most recent paper for it. Ordered newest
     # last so the dict ends up holding the newest per assignment.
@@ -237,7 +248,12 @@ def submit_homework(request, pk):
     teacher marking; nothing about the pipeline is re-implemented here.
     """
     assignment = get_object_or_404(
-        Assignment.objects.select_related("memorandum"), pk=pk
+        scope_by_school(
+            Assignment.objects.select_related("memorandum"),
+            request.user.school,
+            field="created_by__school",
+        ),
+        pk=pk,
     )
     form = HomeworkSubmissionForm(request.POST or None, request.FILES or None)
 

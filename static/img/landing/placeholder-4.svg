@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Placeholder image">
+  <defs>
+    <linearGradient id="sky4" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0" stop-color="#f4e3c6"/>
+      <stop offset="0.5" stop-color="#d69a6a"/>
+      <stop offset="1" stop-color="#7c554f"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="800" fill="url(#sky4)"/>
+  <path d="M0 620 Q150 560 300 610 T600 600 V800 H0 Z" fill="#6a463f" opacity="0.30"/>
+  <path d="M0 690 Q170 640 320 680 T600 670 V800 H0 Z" fill="#4f332f" opacity="0.32"/>
+</svg>

@@ -29,7 +29,8 @@ from dataclasses import dataclass
 
 from django.db.models import Count
 
-from accounts.models import Role, User
+from accounts.models import User
+from accounts.scoping import scope_by_school, students_at_school
 from attendance.models import Attendance
 from classroom.models import Assignment
 from marking.models import Paper
@@ -103,9 +104,16 @@ class StudentRollup:
 
 
 def build_student_rollup(student, *, window_days=ATTENDANCE_WINDOW_DAYS) -> StudentRollup:
-    """The full picture for one learner — the per-student detail view."""
-    school_days = recent_school_days(window_days)
-    assignments = list(Assignment.objects.all())
+    """The full picture for one learner — the per-student detail view.
+
+    Every denominator is scoped to the learner's own school (Sprint 8b): the
+    attendance window counts school days *at this school*, and assignment
+    completion is measured against assignments set by teachers *at this school*,
+    so no cross-school data bleeds into the rollup.
+    """
+    school = student.school
+    school_days = recent_school_days(school, window_days)
+    assignments = _assignments_at_school(school)
 
     papers = _marked_papers([student.id])
     submitted_pairs = _submitted_pairs([student.id])
@@ -123,8 +131,12 @@ def build_student_rollup(student, *, window_days=ATTENDANCE_WINDOW_DAYS) -> Stud
     )
 
 
-def build_class_overview(*, window_days=ATTENDANCE_WINDOW_DAYS) -> list[StudentRollup]:
-    """A rollup per learner, for the scannable student list.
+def build_class_overview(school, *, window_days=ATTENDANCE_WINDOW_DAYS) -> list[StudentRollup]:
+    """A rollup per learner at ``school``, for the scannable student list.
+
+    Scoped to one school (Sprint 8b): only its learners appear, and the
+    attendance window and assignment set are its own. A ``None`` school yields an
+    empty list, so a teacher with no school assigned sees no one.
 
     Built from a handful of bulk queries rather than one set per learner, so a
     whole school's list stays a few queries, not a few hundred. Every learner
@@ -132,7 +144,7 @@ def build_class_overview(*, window_days=ATTENDANCE_WINDOW_DAYS) -> list[StudentR
     and the reasons on the detail page can never disagree.
     """
     students = list(
-        User.objects.filter(role=Role.STUDENT).order_by(
+        students_at_school(school).order_by(
             "first_name", "last_name", "username"
         )
     )
@@ -140,8 +152,8 @@ def build_class_overview(*, window_days=ATTENDANCE_WINDOW_DAYS) -> list[StudentR
         return []
 
     student_ids = [student.id for student in students]
-    school_days = recent_school_days(window_days)
-    assignments = list(Assignment.objects.all())
+    school_days = recent_school_days(school, window_days)
+    assignments = _assignments_at_school(school)
 
     papers = _marked_papers(student_ids)
     submitted_pairs = _submitted_pairs(student_ids)
@@ -165,17 +177,24 @@ def build_class_overview(*, window_days=ATTENDANCE_WINDOW_DAYS) -> list[StudentR
     return overview
 
 
-def recent_school_days(window_days=ATTENDANCE_WINDOW_DAYS) -> list:
-    """The most recent distinct dates on which any attendance was recorded.
+def recent_school_days(school, window_days=ATTENDANCE_WINDOW_DAYS) -> list:
+    """The most recent distinct dates attendance was recorded *at this school*.
 
-    These are the "school days" the attendance rate is measured against. An
-    explicit ``order_by`` keeps the model's default two-field ordering from
-    breaking the DISTINCT.
+    These are the "school days" the attendance rate is measured against —
+    scoped so a school's rate is not diluted by days another school took a
+    register (Sprint 8b). An explicit ``order_by`` keeps the model's default
+    two-field ordering from breaking the DISTINCT.
     """
+    scoped = scope_by_school(
+        Attendance.objects.order_by("-date"), school, field="student__school"
+    )
+    return list(scoped.values_list("date", flat=True).distinct()[:window_days])
+
+
+def _assignments_at_school(school) -> list:
+    """Assignments set by a teacher at ``school`` (empty when school is None)."""
     return list(
-        Attendance.objects.order_by("-date")
-        .values_list("date", flat=True)
-        .distinct()[:window_days]
+        scope_by_school(Assignment.objects.all(), school, field="created_by__school")
     )
 
 

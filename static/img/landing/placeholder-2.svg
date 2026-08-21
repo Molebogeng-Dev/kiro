@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Placeholder image">
+  <defs>
+    <linearGradient id="sky2" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#f2ddc0"/>
+      <stop offset="0.5" stop-color="#df9f74"/>
+      <stop offset="1" stop-color="#93564a"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="800" fill="url(#sky2)"/>
+  <rect y="560" width="600" height="240" fill="#7f4a41" opacity="0.28"/>
+  <rect y="640" width="600" height="160" fill="#5f3733" opacity="0.30"/>
+</svg>

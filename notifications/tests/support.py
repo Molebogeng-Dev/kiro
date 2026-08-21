@@ -11,25 +11,39 @@ from decimal import Decimal
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from accounts.models import ParentStudentLink, Role, User
+from core.models import School
 from marking.models import MarkingResult, Memorandum, Paper, QuestionResult
 
 PASSWORD = "notifications-tests-passphrase-91"
+
+
+def default_school():
+    """A shared school for these helpers (used by notification and progress
+    tests). Sprint 8b scopes the progress dashboard by school, so a teacher and
+    the learners they see must share one unless a test overrides it."""
+    school, _ = School.objects.get_or_create(
+        name="Notifications Test School", defaults={"min_grade": 1, "max_grade": 12}
+    )
+    return school
 
 # A tiny valid file. The marking image content is irrelevant to these tests —
 # nothing re-reads or re-marks the image here — so a stub avoids Pillow work.
 _STUB_IMAGE = SimpleUploadedFile("paper.jpg", b"not-a-real-jpeg", "image/jpeg")
 
 
-def make_teacher(username="teacher"):
+def make_teacher(username="teacher", **extra):
+    extra.setdefault("school", default_school())
     return User.objects.create_user(
         username=username,
         email=f"{username}@example.com",
         password=PASSWORD,
         role=Role.TEACHER,
+        **extra,
     )
 
 
 def make_student(username="student", **extra):
+    extra.setdefault("school", default_school())
     return User.objects.create_user(
         username=username,
         email=f"{username}@example.com",

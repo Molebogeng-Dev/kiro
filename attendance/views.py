@@ -21,6 +21,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.models import Role
 from accounts.permissions import role_required
+from accounts.scoping import scope_by_school
 
 from .forms import (
     FaceEnrollmentForm,
@@ -43,26 +44,37 @@ def _faceapi_context():
     }
 
 
-def _present_student_ids_today():
+def _present_student_ids_today(school):
+    """Ids of this school's learners marked present today."""
     return set(
-        Attendance.objects.filter(
-            date=timezone.localdate(), arrived_at__isnull=False
+        scope_by_school(
+            Attendance.objects.filter(
+                date=timezone.localdate(), arrived_at__isnull=False
+            ),
+            school,
+            field="student__school",
         ).values_list("student_id", flat=True)
     )
 
 
 @role_required(Role.TEACHER)
 def attendance_index(request):
-    """A small hub linking to each attendance task, with today's tallies."""
-    present_ids = _present_student_ids_today()
+    """A small hub linking to each attendance task, with today's tallies.
+
+    Every tally is scoped to the acting teacher's school (Sprint 8b).
+    """
+    school = request.user.school
+    present_ids = _present_student_ids_today(school)
     return render(
         request,
         "attendance/index.html",
         {
             "present_today": len(present_ids),
-            "primary_total": primary_students().count(),
-            "secondary_total": secondary_students().count(),
-            "enrolled_total": FaceEnrollment.objects.count(),
+            "primary_total": primary_students(school).count(),
+            "secondary_total": secondary_students(school).count(),
+            "enrolled_total": scope_by_school(
+                FaceEnrollment.objects.all(), school, field="student__school"
+            ).count(),
             "nav_active": "attendance",
         },
     )
@@ -71,8 +83,8 @@ def attendance_index(request):
 @role_required(Role.TEACHER)
 @require_http_methods(["GET", "POST"])
 def roll_call(request):
-    """Manual register for primary students (grades 1-7)."""
-    students = list(primary_students())
+    """Manual register for primary students (grades 1-7) at this school."""
+    students = list(primary_students(request.user.school))
 
     if request.method == "POST":
         # Only ids that are genuinely primary students are honoured; anything
@@ -94,7 +106,7 @@ def roll_call(request):
         )
         return redirect("attendance:roll_call")
 
-    present_ids = _present_student_ids_today()
+    present_ids = _present_student_ids_today(request.user.school)
     for student in students:
         student.is_present_today = student.id in present_ids
 
@@ -114,7 +126,7 @@ def roll_call(request):
 @require_http_methods(["GET", "POST"])
 def enroll(request):
     """Enroll a secondary student's face, with explicit consent."""
-    form = FaceEnrollmentForm(request.POST or None)
+    form = FaceEnrollmentForm(request.POST or None, school=request.user.school)
 
     if request.method == "POST" and form.is_valid():
         student = form.cleaned_data["student"]
@@ -140,7 +152,11 @@ def enroll(request):
         "attendance/enroll.html",
         {
             "form": form,
-            "enrolled": FaceEnrollment.objects.select_related("student").all(),
+            "enrolled": scope_by_school(
+                FaceEnrollment.objects.select_related("student"),
+                request.user.school,
+                field="student__school",
+            ),
             **_faceapi_context(),
             "nav_active": "attendance",
         },
@@ -169,7 +185,13 @@ def check_in(request):
         else:
             match = best_match(
                 descriptor,
-                FaceEnrollment.objects.select_related("student"),
+                # Only match against faces enrolled at this teacher's school, so
+                # a student at another school can never be checked in here.
+                scope_by_school(
+                    FaceEnrollment.objects.select_related("student"),
+                    request.user.school,
+                    field="student__school",
+                ),
                 threshold=settings.ATTENDANCE_FACE_MATCH_THRESHOLD,
             )
             if match is None:
@@ -200,7 +222,7 @@ def check_in(request):
             "result": result,
             "matched": matched,
             "first_today": first_today,
-            "fallback_form": FallbackMarkForm(),
+            "fallback_form": FallbackMarkForm(school=request.user.school),
             **_faceapi_context(),
             "nav_active": "attendance",
         },
@@ -218,7 +240,7 @@ def mark_present(request):
     is secondary-only, keeping primary learners in the roll-call where they
     belong.
     """
-    form = FallbackMarkForm(request.POST)
+    form = FallbackMarkForm(request.POST, school=request.user.school)
     if form.is_valid():
         student = form.cleaned_data["student"]
         record_scan(student, method=Attendance.Method.MANUAL, recorded_by=request.user)
@@ -234,9 +256,13 @@ def mark_present(request):
 
 @role_required(Role.TEACHER)
 def history(request):
-    """Everyone marked present today, across both methods. Any teacher."""
+    """Everyone at this school marked present today. Any teacher at the school."""
     records = (
-        Attendance.objects.filter(date=timezone.localdate())
+        scope_by_school(
+            Attendance.objects.filter(date=timezone.localdate()),
+            request.user.school,
+            field="student__school",
+        )
         .select_related("student")
         .order_by("student__grade", "student__username")
     )

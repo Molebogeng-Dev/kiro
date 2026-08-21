@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Register &middot; iSgela{% endblock %}
+{% block title %}Register a school &middot; iSgela{% endblock %}
 
 {% block content %}
   <div class="page-head">
-    <h1>Create your iSgela account</h1>
+    <h1>Register your school</h1>
     <p class="page-head__lead">
-      Choose the role that describes you. It decides what you see after logging in.
+      This creates your school and your admin account together. Afterwards you
+      can share the join codes and list your teachers.
     </p>
   </div>
 
@@ -25,15 +26,13 @@
       {% endfor %}
 
       <div class="form__actions">
-        <button type="submit" class="button button--block">Create account</button>
+        <button type="submit" class="button button--block">Register school</button>
       </div>
     </form>
 
-    <p class="muted" style="margin-top:1.25rem;margin-bottom:0.35rem">
-      Registering a school? <a href="{% url 'accounts:register_school' %}">Set up a school here</a>.
-    </p>
-    <p class="muted" style="margin:0">
-      Already registered? <a href="{% url 'accounts:login' %}">Log in</a>.
+    <p class="muted" style="margin-top:1.25rem;margin-bottom:0">
+      Joining an existing school instead?
+      <a href="{% url 'accounts:register' %}">Register as a teacher, student, or parent</a>.
     </p>
   </div>
 {% endblock %}

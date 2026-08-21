@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}iSgela &middot; teachers, learners, and parents in one loop{% endblock %}
+
+{% block body_class %}landing-page{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+  <style>
+    /* Full-page background image with a mono black & white filter.
+       The filter is applied to a fixed pseudo-element layer so it only
+       affects the image, leaving page content in full colour. */
+    .landing-page {
+      position: relative;
+    }
+    .landing-page::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: url("{% static 'img/landing/teachers.png' %}") center / cover no-repeat;
+      filter: blur(2px) ;
+
+
+      
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  {# ===================================================================== #}
+  {#  HERO — headline + the interactive frame selector                     #}
+  {# ===================================================================== #}
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero__intro">
+      <!-- <p class="hero__eyebrow">iSgela</p> -->
+      <h1 id="hero-title" class="hero__title">
+        Teachers, learners, and parents &mdash; in one loop.
+      </h1>
+      <p class="hero__lead">
+        An AI-powered platform for South African schools. When a paper is marked,
+        homework is missed, or a learner is away, the people who need to know find
+        out automatically. Pick where you fit and open the frame.
+      </p>
+    </div>
+
+    {# ------------------------------------------------------------------ #}
+    {#  INTERACTIVE SELECTOR                                              #}
+    {#                                                                    #}
+    {#  A row of image frames. Click one and it expands to reveal that    #}
+    {#  part of iSgela — a short description and a way in. The first frame #}
+    {#  starts open; static/js/landing.js handles clicking between them.  #}
+    {#  With JavaScript off, hover or keyboard-focus opens a frame, so the #}
+    {#  page stays fully usable either way.                               #}
+    {# ------------------------------------------------------------------ #}
+    <ul class="selector" data-selector aria-label="Who iSgela is for">
+      {# ---- Teachers ---- #}
+      <li class="option option--is-open"
+          data-option
+          style="--option-bg: url('{% static 'img/landing/about.jpeg' %}');">
+        <button type="button" class="option__trigger" aria-expanded="true">
+          <span class="visually-hidden">Open the Teachers frame</span>
+        </button>
+        <span class="option__shadow" aria-hidden="true"></span>
+        <div class="option__label">
+          <span class="option__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M22 10 12 5 2 10l10 5 10-5Z"></path>
+              <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"></path>
+            </svg>
+          </span>
+          <div class="option__info">
+            <p class="option__title">Teachers</p>
+            <p class="option__desc">
+              Mark a class set in minutes and see, at a glance, who needs a hand
+              &mdash; with feedback that explains why, not just what.
+            </p>
+            <a class="option__cta" href="{% url 'accounts:register' %}">
+              Join with your invite &rarr;
+            </a>
+          </div>
+        </div>
+      </li>
+
+      {# ---- Students ---- #}
+      <li class="option"
+          data-option
+          style="--option-bg: url('{% static 'img/landing/background.jpeg' %}');">
+        <button type="button" class="option__trigger" aria-expanded="false">
+          <span class="visually-hidden">Open the Students frame</span>
+        </button>
+        <span class="option__shadow" aria-hidden="true"></span>
+        <div class="option__label">
+          <span class="option__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M22 10 12 5 2 10l10 5 10-5Z"></path>
+              <path d="M12 15v5"></path>
+              <path d="M20 11.5V15"></path>
+            </svg>
+          </span>
+          <div class="option__info">
+            <p class="option__title">Students</p>
+            <p class="option__desc">
+              Submit homework from your phone and get clear feedback on every
+              question, plus the study material your teachers share.
+            </p>
+            <a class="option__cta" href="{% url 'accounts:register' %}">
+              Create your account &rarr;
+            </a>
+          </div>
+        </div>
+      </li>
+
+      {# ---- Parents ---- #}
+      <li class="option"
+          data-option
+          style="--option-bg: url('{% static 'img/landing/parents.jpg' %}');">
+        <button type="button" class="option__trigger" aria-expanded="false">
+          <span class="visually-hidden">Open the Parents frame</span>
+        </button>
+        <span class="option__shadow" aria-hidden="true"></span>
+        <div class="option__label">
+          <span class="option__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <circle cx="9" cy="8" r="3"></circle>
+              <circle cx="17" cy="9" r="2.5"></circle>
+              <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"></path>
+              <path d="M15 14.2c2.4.2 4 2.1 4 4.8"></path>
+            </svg>
+          </span>
+          <div class="option__info">
+            <p class="option__title">Parents</p>
+            <p class="option__desc">
+              Follow your child's marks and attendance as they happen, in plain
+              language &mdash; without having to be at the school to ask.
+            </p>
+            <a class="option__cta" href="{% url 'accounts:register' %}">
+              Link to your child &rarr;
+            </a>
+          </div>
+        </div>
+      </li>
+
+      {# ---- Schools ---- #}
+      <li class="option"
+          data-option
+          style="--option-bg: url('{% static 'img/landing/school2.jpg' %}');">
+        <button type="button" class="option__trigger" aria-expanded="false">
+          <span class="visually-hidden">Open the Schools frame</span>
+        </button>
+        <span class="option__shadow" aria-hidden="true"></span>
+        <div class="option__label">
+          <span class="option__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M3 21h18"></path>
+              <path d="M5 21V9l7-4 7 4v12"></path>
+              <path d="M10 21v-5h4v5"></path>
+            </svg>
+          </span>
+          <div class="option__info">
+            <p class="option__title">Schools</p>
+            <p class="option__desc">
+              Set up your school, choose its grade range, and invite your teachers
+              in a few steps. Everyone joins with a code.
+            </p>
+            <a class="option__cta" href="{% url 'accounts:register_school' %}">
+              Register your school &rarr;
+            </a>
+          </div>
+        </div>
+      </li>
+
+      {# ---- About ---- #}
+      <li class="option"
+          data-option
+          style="--option-bg: url('{% static 'img/landing/school.jpg' %}');">
+        <button type="button" class="option__trigger" aria-expanded="false">
+          <span class="visually-hidden">Open the About frame</span>
+        </button>
+        <span class="option__shadow" aria-hidden="true"></span>
+        <div class="option__label">
+          <span class="option__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 16v-4"></path>
+              <path d="M12 8h.01"></path>
+            </svg>
+          </span>
+          <div class="option__info">
+            <p class="option__title">About</p>
+            <p class="option__desc">
+              The problem iSgela solves, what it does, and how the teacher,
+              student, and parent all connect in one loop.
+            </p>
+            <a class="option__cta" href="{% url 'core:about' %}">
+              Learn more &rarr;
+            </a>
+          </div>
+        </div>
+      </li>
+    </ul>
+
+    <div class="hero__cta button-row">
+      <a class="button" href="{% url 'accounts:register' %}">Get started</a>
+      <a class="button button--secondary" href="{% url 'accounts:login' %}">Log in</a>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/landing.js' %}" defer></script>
+{% endblock %}

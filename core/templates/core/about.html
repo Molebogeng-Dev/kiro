@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}About iSgela &middot; the problem it solves and what it does{% endblock %}
+
+{% block body_class %}landing-page{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+{% endblock %}
+
+{% block content %}
+  {# ===================================================================== #}
+  {#  PAGE INTRO                                                            #}
+  {# ===================================================================== #}
+  <section class="landing-section" aria-labelledby="about-title">
+    <div class="landing-section__head">
+      <p class="hero__eyebrow">About iSgela</p>
+      <h1 id="about-title">Teachers, learners, and parents &mdash; in one loop.</h1>
+      <p class="landing-section__lead">
+        iSgela is an AI-powered platform for South African schools. When a paper
+        is marked, homework is missed, or a learner is away, the people who need
+        to know find out automatically.
+      </p>
+    </div>
+  </section>
+
+  {# ===================================================================== #}
+  {#  THE PROBLEM — and how iSgela closes it                               #}
+  {# ===================================================================== #}
+  <section class="landing-section" aria-labelledby="problem-title">
+    <div class="landing-section__head">
+      <h2 id="problem-title">The problem it solves</h2>
+      <p class="landing-section__lead">
+        Schooling has a connection problem, not just a resourcing one &mdash; three
+        groups who need to work together often aren't in contact at all.
+      </p>
+    </div>
+
+    <div class="problem">
+      <ul class="problem__list">
+        <li class="problem__item">
+          <h3>Parents are left out</h3>
+          <p>
+            Working long hours, many parents can't get to the school to ask how
+            their child is really doing &mdash; and find out too late, or not at all.
+          </p>
+        </li>
+        <li class="problem__item">
+          <h3>Teachers can't see the pattern</h3>
+          <p>
+            Marking by hand leaves little time to track <em>why</em> a learner
+            keeps getting something wrong and step in early.
+          </p>
+        </li>
+        <li class="problem__item">
+          <h3>Students slip quietly</h3>
+          <p>
+            Not every child speaks up when they're struggling or skipping work.
+            Without something watching for it, it goes unnoticed.
+          </p>
+        </li>
+      </ul>
+      <p class="problem__solution">
+        <strong>iSgela closes these gaps</strong> by putting the teacher, student,
+        and parent in one connected loop &mdash; so a marked paper, a missed
+        assignment, or an absence reaches the right person automatically, instead
+        of depending on everyone finding time to talk.
+      </p>
+    </div>
+  </section>
+
+  {# ===================================================================== #}
+  {#  WHAT IT DOES — the features                                          #}
+  {# ===================================================================== #}
+  <section class="landing-section" aria-labelledby="does-title">
+    <div class="landing-section__head">
+      <h2 id="does-title">What it does</h2>
+    </div>
+
+    <ul class="landing-grid">
+      <li class="feature-card">
+        <h3>Scan &amp; Mark</h3>
+        <p>
+          Photograph a paper or submit homework by camera. AI marks it against the
+          memorandum and explains why an answer was wrong &mdash; and how to help.
+        </p>
+      </li>
+      <li class="feature-card">
+        <h3>Attendance</h3>
+        <p>
+          A familiar roll-call for the younger grades, and a quick facial check-in
+          for the older ones. Both land on one shared record.
+        </p>
+      </li>
+      <li class="feature-card">
+        <h3>Three connected portals</h3>
+        <p>
+          Teacher, student, and parent each see what matters to them, in one
+          place, without a separate app for each.
+        </p>
+      </li>
+      <li class="feature-card">
+        <h3>Parent notifications</h3>
+        <p>
+          Plain-language summaries reach a parent the moment their child's work is
+          marked &mdash; nothing to log in and go looking for.
+        </p>
+      </li>
+      <li class="feature-card">
+        <h3>Progress dashboard</h3>
+        <p>
+          A whole-school view of marks, attendance, and assignments that flags who
+          needs attention &mdash; by clear, checkable rules, not a black box.
+        </p>
+      </li>
+    </ul>
+  </section>
+
+  {# ===================================================================== #}
+  {#  CLOSING CALL TO ACTION                                               #}
+  {# ===================================================================== #}
+  <section class="cta-band" aria-labelledby="cta-title">
+    <h2 id="cta-title">Bring everyone into the loop</h2>
+    <p>
+      Create an account in a couple of minutes, or set up your whole school and
+      invite your teachers.
+    </p>
+    <div class="button-row">
+      <a class="button button--on-brand" href="{% url 'accounts:register' %}">Get started</a>
+      <a class="button button--secondary" href="{% url 'accounts:register_school' %}">Register your school</a>
+    </div>
+  </section>
+{% endblock %}

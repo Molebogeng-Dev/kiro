@@ -25,8 +25,14 @@ E164_VALIDATOR = RegexValidator(
 
 
 class Role(models.TextChoices):
-    """The three roles in the teacher/student/parent loop."""
+    """The roles in iSgela.
 
+    The teacher/student/parent loop is the original three. ``school_admin``
+    (Sprint 8a) registers a school and its teachers, and is the role that makes
+    ``User.school`` meaningful for everyone else.
+    """
+
+    SCHOOL_ADMIN = "school_admin", "School admin"
     TEACHER = "teacher", "Teacher"
     STUDENT = "student", "Student"
     PARENT = "parent", "Parent"
@@ -45,6 +51,7 @@ MAX_GRADE = 12
 # Where each role goes after logging in. Kept next to Role so that adding a
 # role in a later sprint is a single-place change.
 ROLE_DASHBOARD_URL_NAMES = {
+    Role.SCHOOL_ADMIN: "core:school_admin_dashboard",
     Role.TEACHER: "core:teacher_dashboard",
     Role.STUDENT: "core:student_dashboard",
     Role.PARENT: "core:parent_dashboard",
@@ -61,7 +68,8 @@ class User(AbstractUser):
     """
 
     role = models.CharField(
-        max_length=10,
+        # Wide enough for the longest role value ("school_admin").
+        max_length=20,
         choices=Role.choices,
         help_text="Determines which dashboard this account can reach.",
     )
@@ -93,8 +101,11 @@ class User(AbstractUser):
         help_text="International format, e.g. +27821234567. Only set for parents.",
     )
 
-    # Placeholder link to the stub School model. The real school/class
-    # structure lands in a later sprint.
+    # The school this account belongs to. Set at registration (Sprint 8a) for
+    # every role — including the school_admin, who points at the school they
+    # just created — so "which school is this user in?" is one query,
+    # ``request.user.school``, regardless of role. Nullable so pre-Sprint-8a
+    # accounts and superusers stay valid; the registration flows require it.
     school = models.ForeignKey(
         "core.School",
         on_delete=models.SET_NULL,
@@ -113,6 +124,10 @@ class User(AbstractUser):
     def __str__(self):
         label = self.get_full_name() or self.username
         return f"{label} ({self.get_role_display() or 'no role'})"
+
+    @property
+    def is_school_admin(self) -> bool:
+        return self.role == Role.SCHOOL_ADMIN
 
     @property
     def is_teacher(self) -> bool:

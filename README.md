@@ -38,6 +38,15 @@ At scale, this also becomes a dataset many countries doesn't currently have: rea
   A parent can link themselves to a student's account by entering that student's username at registration. There is no confirmation step from the student or a teacher. For an MVP this keeps onboarding simple, but in a production version this link should requireapproval — e.g. a "pending" state confirmed by the student or a teacher — before a parent can view a child's academic records, attendance, or homework results.
   This is a deliberate scope decision for the hackathon timeline, not an oversight.
 
+- **School join is self-declared via a shared code.**
+  A student or parent picks their school and types its shared join code; anyone
+  with the code can join that school as that role. The code gates casual
+  sign-up, it is not strong authentication, and a leaked student/parent code
+  lets someone join until it is rotated (rotation is not built yet). Teacher
+  invites, by contrast, are single-use and per-person. This mirrors the
+  self-declared parent/student link above: fine for an MVP, tightened in a
+  production version.
+
 - **Static files are served by the application process.**
   WhiteNoise sits in the middleware so the interface stylesheet and the Django
   admin both render from a single container. For anything beyond a demo this
@@ -522,6 +531,99 @@ records through the same normalization.
 If the threshold numbers turn out not to mean much against real data, they are a
 one-line change each and the reasons update to match — they are deliberately not
 buried.
+
+## Schools and registration
+
+`core.School` is the boundary the app has needed since attendance: every account
+carries a `school`, set at registration (Sprint 8a), and every "any teacher, any
+student" view now reads it (Sprint 8b). So the reach of a teacher is "any student
+**at the same school**", not the whole system.
+
+A fourth role, `school_admin`, joins teacher/student/parent. It is gated by the
+same `role_required` decorator as the rest.
+
+| Who | How they register | Path |
+| --- | --- | --- |
+| School admin | Creates the school + their own account in one step | `/accounts/register/school/` |
+| Teacher | Joins a school with a personal single-use invite code | `/accounts/register/` |
+| Student / parent | Joins a school with the school's shared join code | `/accounts/register/` |
+
+- A **school** has a name, a flexible grade range (stored as `min_grade`/
+  `max_grade`, with "Primary (1–7)" and "Secondary (8–12)" presets at
+  registration), a `created_by` admin, and two shared join codes generated at
+  creation. The admin's own `User.school` points at the school they created, so
+  every role — admin included — is reachable through `request.user.school`.
+- **Join codes are shared and reusable.** Many students at a school type the one
+  `student_join_code`; many parents type the one `parent_student_join_code`.
+  They are not consumed by use — that is what distinguishes them from a teacher
+  invite. A learner picks their school, then types the code; a wrong code, or the
+  parent code used by a student, is refused with a clear error and no account is
+  created.
+- **A `TeacherInvite` is single-use.** The admin lists a teacher by name and
+  assigned grade(s) on their dashboard, which mints a unique code — a reserved
+  slot, not an account. The teacher's account is created when they register and
+  claim it. Claiming is **atomic**: a single conditional `UPDATE`
+  (`claimed_by__isnull=True` in the filter) means two simultaneous registrations
+  against the same code cannot both succeed — exactly one sees a row updated, the
+  other is refused, and the whole registration rolls back rather than leaving a
+  half-made account. No application-level read-then-write gap for a race to slip
+  through.
+
+### School-scoped access (Sprint 8b)
+
+Every view that used to say "any teacher, any student" now says "at the same
+school". The filter lives in one place, `accounts/scoping.py`, because the one
+subtlety worth centralising is `None`: a bare `filter(school=user.school)` with
+`user.school` being `None` would match *every* school-less account. So the rule
+is **a `None` school scopes to nothing** — a user with no school sees no one, not
+everyone else who also has none.
+
+Scoped this sprint: the attendance roll-call, check-in/enrollment, and history;
+the progress dashboard's list and each rollup (including its attendance window
+and assignment denominator, so no cross-school count leaks in); the marking
+student picker (which also rejects a tampered cross-school id on submit, since
+the field validates against the scoped queryset); and the student-facing
+assignment and study-material lists. Student registration now also rejects a
+grade outside the selected school's range.
+
+Unchanged, by design: marking's per-teacher ownership (already narrower than
+school), and `ParentStudentLink` (independent of school).
+
+> **Note on pre-8a accounts.** Accounts created before schools existed have
+> `school=None` and are therefore scoped out of these views (a teacher sees no
+> learners, a student sees no assignments) until assigned a school — via the
+> admin, or by re-registering with a code. This is the `None` guard working as
+> intended, not a bug, but it does mean any legacy account needs a school before
+> the scoped features work for it.
+
+## Running with Docker Compose
+
+For a one-command demo, `docker-compose.yml` builds the image (from the same
+`Dockerfile`) and runs it against your Supabase database. There is no database
+service in the compose file on purpose — iSgela uses Supabase (external managed
+Postgres), configured through `.env`.
+
+```bash
+./docker.sh run      # build the image and start it (http://localhost:8000)
+./docker.sh logs     # follow the logs
+./docker.sh down     # stop and remove it
+```
+
+`docker.sh` is a thin wrapper over `docker compose` (kept separate from `run.sh`,
+which is for local non-Docker development). Other subcommands: `build`, `up`,
+`ps`, `shell`, `restart`. Override the published port with
+`HOST_PORT=9000 ./docker.sh up`.
+
+Two deliberate choices worth knowing:
+
+- **`.env` is mounted read-only, not passed via `env_file`.** The app reads it
+  directly with `python-decouple`, and mounting keeps Compose from interpolating
+  secrets — a `SECRET_KEY` (or DB password) containing a literal `$` would
+  otherwise be silently mangled. The file is never baked into the image
+  (`.dockerignore` excludes it).
+- **Migrations and bucket creation run on start** (the entrypoint's opt-in flags,
+  set to `1` in compose) because a single demo container is one replica. For
+  multiple replicas, run migrations out of band instead.
 
 ## Continuous integration
 

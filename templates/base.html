@@ -6,15 +6,16 @@
   <meta name="theme-color" content="#0f6e5c">
   <title>{% block title %}iSgela{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/isgela.css' %}">
+  {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site-header">
     <div class="site-header__bar">
       <a class="brand" href="{% url 'core:home' %}">
         <span class="brand__mark" aria-hidden="true">iS</span>
-        <span>iSgela</span>
+        <span>I S G E L A</span>
       </a>
 
       <div class="site-header__spacer"></div>
@@ -29,6 +30,7 @@
           <button type="submit" class="button button--secondary">Log out</button>
         </form>
       {% else %}
+        <a class="button" href="{% url 'accounts:register_school' %}">Register Your School</a>
         <a class="button button--secondary" href="{% url 'accounts:login' %}">Log in</a>
         <a class="button" href="{% url 'accounts:register' %}">Register</a>
       {% endif %}
@@ -119,5 +121,6 @@
   </footer>
 
   <script src="{% static 'js/isgela.js' %}" defer></script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>
