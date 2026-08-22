@@ -6,9 +6,15 @@ working rather than just linking elsewhere. The student and parent dashboards ar
 still placeholders, filled in by Sprints 4 and 6.
 """
 
+import json
+import logging
+import time
+
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from accounts.forms import TeacherInviteForm
 from accounts.models import Role
@@ -17,8 +23,19 @@ from accounts.scoping import scope_by_school, students_at_school
 from attendance.models import Attendance
 from classroom.models import Assignment, StudyMaterial
 from marking.models import Memorandum, Paper
+from marking.openrouter import (
+    InsufficientCredit,
+    ModelUnavailable,
+    OpenRouterError,
+    OpenRouterNotConfigured,
+    RateLimited,
+    ServiceUnavailable,
+)
 
+from .assistant import AssistantQueryError, ask, clean_query
 from .progress import build_class_overview, build_student_rollup
+
+logger = logging.getLogger(__name__)
 
 # Enough to show the work is happening, few enough that the actions stay visible
 # without scrolling on a laptop.
@@ -56,6 +73,104 @@ def about(request):
     in or not, and is linked from the About frame on the landing page.
     """
     return render(request, "core/about.html", {"nav_active": "about"})
+
+
+# --------------------------------------------------------------------------- #
+# Landing-page assistant ("Ask iSgela")
+# --------------------------------------------------------------------------- #
+#
+# A public, text-only Q&A helper on the landing page, backed by the same
+# OpenRouter/Qwen client the marking engine uses. It is intentionally NOT behind
+# login, because the landing page is served to anonymous visitors — which makes
+# it an open, quota-spending surface. Two light guards keep that in check: a
+# per-query length cap (assistant.clean_query) and the per-session rate limit
+# below. Neither replaces stronger protection (a captcha, or gating behind
+# login) should abuse ever become a real problem.
+
+# How each model/transport failure surfaces over HTTP, mirroring marking.views:
+# 429 means "wait and retry", 5xx means "not right now", so the browser can tell
+# the two apart.
+ASSISTANT_STATUS_CODES = {
+    RateLimited: 429,
+    InsufficientCredit: 402,
+    ModelUnavailable: 503,
+    ServiceUnavailable: 503,
+    OpenRouterNotConfigured: 503,
+}
+
+# Session rate limit: at most this many questions within the rolling window.
+ASSISTANT_RATE_LIMIT = 15
+ASSISTANT_RATE_WINDOW_SECONDS = 60
+
+
+def _assistant_rate_limited(request) -> bool:
+    """True when this session has asked too many questions recently.
+
+    Keeps a short list of request timestamps in the session and drops anything
+    older than the window. Best-effort only: it deters casual hammering, not a
+    determined caller who can discard the session cookie between requests.
+    """
+    now = time.time()
+    window_start = now - ASSISTANT_RATE_WINDOW_SECONDS
+    history = [t for t in request.session.get("assistant_hits", []) if t > window_start]
+
+    if len(history) >= ASSISTANT_RATE_LIMIT:
+        request.session["assistant_hits"] = history
+        return True
+
+    history.append(now)
+    request.session["assistant_hits"] = history
+    return False
+
+
+@require_POST
+def assistant_query(request):
+    """Answer one school-related question as JSON for the landing-page bar.
+
+    Expects a JSON body ``{"query": "..."}`` and returns ``{"answer": ...}`` on
+    success. Any model failure is mapped to a matching HTTP status so the client
+    can distinguish "try again shortly" from "this will not work".
+    """
+    try:
+        payload = json.loads(request.body or b"{}")
+    except (ValueError, TypeError):
+        return JsonResponse(
+            {"error": "invalid_request", "detail": "Send a JSON body."}, status=400
+        )
+
+    if not isinstance(payload, dict):
+        return JsonResponse(
+            {"error": "invalid_request", "detail": "Send a JSON object."}, status=400
+        )
+
+    try:
+        query = clean_query(payload.get("query"))
+    except AssistantQueryError as exc:
+        return JsonResponse({"error": "invalid_query", "detail": str(exc)}, status=400)
+
+    if _assistant_rate_limited(request):
+        return JsonResponse(
+            {
+                "error": "rate_limited",
+                "detail": "You're asking a lot in a short time. Give it a moment, then try again.",
+            },
+            status=429,
+        )
+
+    try:
+        completion = ask(query)
+    except OpenRouterError as exc:
+        logger.info("Assistant query failed: %s", exc)
+        return JsonResponse(
+            {
+                "error": "assistant_unavailable",
+                "detail": "The assistant is unavailable right now. Please try again shortly.",
+                "retry_after": getattr(exc, "retry_after", None),
+            },
+            status=ASSISTANT_STATUS_CODES.get(type(exc), 502),
+        )
+
+    return JsonResponse({"answer": completion.content, "model": completion.model})
 
 
 @role_required(Role.SCHOOL_ADMIN)

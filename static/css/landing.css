@@ -60,14 +60,15 @@ body.landing-page .site-header {
 }
 
 body.landing-page .site-footer {
-  border-top-color: rgba(120, 78, 54, 0.22);
-  color: var(--landing-ink-soft);
+  border-top-color:var(--brand-dark);
+  color: white;
 }
 
 /* Section headings sit directly on the warm wash (large text, so contrast is
    comfortable); descriptive copy lives inside white cards below them. */
 body.landing-page h2 {
-  color: var(--landing-ink);
+  color: white;
+  text-decoration: underline;
 }
 
 /* --------------------------------------------------------------------------
@@ -126,15 +127,13 @@ body.landing-page h2 {
 .hero__title {
   margin: 0;
   
-  font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+  font-family:Arial, Helvetica, sans-serif;
   font-size: clamp(2.1rem, 1.4rem + 3.2vw, 3.6rem);
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -0.03em;
   color: white;
-  /* A soft warm halo lifts the words off any darker images passing behind. */
-  text-shadow: 0 1px 1px rgba(56, 145, 86, 0.55),
-    0 2px 18px rgba(11, 101, 23, 0.623);
+
 }
 
 .hero__lead {
@@ -703,5 +702,211 @@ body.landing-page h2 {
   .option,
   .option__info {
     transition: none;
+  }
+}
+
+/* ==========================================================================
+   Ask iSgela — the landing-page assistant
+   --------------------------------------------------------------------------
+   A ChatGPT-style bar under the hero: a rounded input with a send button, the
+   answers stacking below it, and a "Thinking…" indicator while the model is
+   reached. static/js/assistant.js drives the behaviour; this is the look.
+   ========================================================================== */
+
+.assistant {
+  max-width: 48rem;
+  margin: clamp(2.5rem, 7vh, 4.5rem) auto 0;
+  padding: 0 1.25rem;
+}
+
+.assistant__head {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.assistant__head h2 {
+  margin: 0 0 0.4rem;
+}
+
+.assistant__head p {
+  margin: 0 auto;
+  max-width: 46ch;
+  color: white;
+  font-size: 1.02rem;
+}
+
+.assistant__form {
+  margin: 0;
+}
+
+/* The bar: a rounded pill holding the text field and the send button, lifted
+   off the sunset on a white surface. Turns emerald when focused. */
+.assistant__bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.5rem 1.1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.assistant__bar:focus-within {
+  border-color: var(--brand-bright);
+  box-shadow: 0 0 0 3px rgba(20, 163, 127, 0.18), var(--shadow);
+}
+
+/* Auto-growing textarea styled to read like a single-line search field until
+   the question needs more room. */
+.assistant__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  padding: 0.5rem 0;
+  max-height: 200px;
+}
+
+.assistant__input::placeholder {
+  color: var(--ink-soft);
+}
+
+/* Circular send button. */
+.assistant__send {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  background: var(--brand);
+  box-shadow: 0 4px 10px rgba(12, 122, 99, 0.35);
+  transition: background 0.2s var(--ease), transform 0.1s var(--ease);
+}
+
+.assistant__send:hover {
+  background: var(--brand-dark);
+}
+
+.assistant__send:active {
+  transform: scale(0.94);
+}
+
+.assistant__send:disabled {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* Results: a stack of question → answer exchanges below the bar. */
+.assistant__results {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.assistant__exchange {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.25rem;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.assistant__question {
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+
+.assistant__question::before {
+  content: "You";
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.15rem;
+}
+
+.assistant__answer {
+  color: var(--ink);
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.assistant__answer-p {
+  margin: 0 0 0.7rem;
+}
+
+.assistant__answer-p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant__error {
+  margin: 0;
+  color: var(--danger, #b42318);
+  font-weight: 600;
+}
+
+/* The thinking indicator: a spinning ring plus a soft pulsing label. */
+.assistant__thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink-soft);
+}
+
+.assistant__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(12, 122, 99, 0.25);
+  border-top-color: var(--brand);
+  animation: assistant-spin 0.7s linear infinite;
+}
+
+.assistant__thinking-text {
+  font-weight: 600;
+  animation: assistant-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes assistant-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes assistant-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant__spinner {
+    animation-duration: 1.4s;
+  }
+  .assistant__thinking-text {
+    animation: none;
   }
 }

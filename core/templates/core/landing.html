@@ -36,10 +36,10 @@
     <div class="hero__intro">
       <!-- <p class="hero__eyebrow">iSgela</p> -->
       <h1 id="hero-title" class="hero__title">
-        Teachers, learners, and parents &mdash; in one loop.
+        Teachers, learners, parents and schools &mdash; in one loop.
       </h1>
       <p class="hero__lead">
-        An AI-powered platform for South African schools. When a paper is marked,
+        An AI-powered platform for African schools. When a paper is marked,
         homework is missed, or a learner is away, the people who need to know find
         out automatically. Pick where you fit and open the frame.
       </p>
@@ -88,7 +88,7 @@
       {# ---- Students ---- #}
       <li class="option"
           data-option
-          style="--option-bg: url('{% static 'img/landing/background.jpeg' %}');">
+          style="--option-bg: url('{% static 'img/landing/background.png' %}');">
         <button type="button" class="option__trigger" aria-expanded="false">
           <span class="visually-hidden">Open the Students frame</span>
         </button>
@@ -151,7 +151,7 @@
       {# ---- Schools ---- #}
       <li class="option"
           data-option
-          style="--option-bg: url('{% static 'img/landing/school2.jpg' %}');">
+          style="--option-bg: url('{% static 'img/landing/school2.png' %}');">
         <button type="button" class="option__trigger" aria-expanded="false">
           <span class="visually-hidden">Open the Schools frame</span>
         </button>
@@ -182,7 +182,7 @@
       {# ---- About ---- #}
       <li class="option"
           data-option
-          style="--option-bg: url('{% static 'img/landing/school.jpg' %}');">
+          style="--option-bg: url('{% static 'img/landing/school.jpeg' %}');">
         <button type="button" class="option__trigger" aria-expanded="false">
           <span class="visually-hidden">Open the About frame</span>
         </button>
@@ -216,8 +216,58 @@
       <a class="button button--secondary" href="{% url 'accounts:login' %}">Log in</a>
     </div>
   </section>
+
+  {# ===================================================================== #}
+  {#  ASK iSgela — a school-focused assistant                              #}
+  {#                                                                       #}
+  {#  A ChatGPT-style bar backed by the same OpenRouter/Qwen model the app #}
+  {#  uses to mark papers. Ask a question, the answer appears below the    #}
+  {#  bar, and a "Thinking…" indicator shows while the model is reached.   #}
+  {#  static/js/assistant.js drives it; the endpoint is core:assistant_query. #}
+  {# ===================================================================== #}
+  <section class="assistant" aria-labelledby="assistant-title">
+    <div class="assistant__head">
+      <h2 id="assistant-title">Ask iSgela</h2>
+      <p>
+        Questions about the platform, or anything school-related &mdash; marking,
+        homework, study tips, attendance. Ask away.
+      </p>
+    </div>
+
+    <form class="assistant__form"
+          data-assistant-form
+          action="{% url 'core:assistant_query' %}">
+      {% csrf_token %}
+      <div class="assistant__bar">
+        <label class="visually-hidden" for="assistant-input">Ask a school-related question</label>
+        <textarea id="assistant-input"
+                  class="assistant__input"
+                  name="query"
+                  rows="1"
+                  maxlength="1000"
+                  autocomplete="off"
+                  placeholder="Ask about iSgela or anything school-related…"
+                  data-assistant-input></textarea>
+        <button type="submit"
+                class="assistant__send"
+                data-assistant-send
+                aria-label="Send question">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+               stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5"></path>
+            <path d="m5 12 7-7 7 7"></path>
+          </svg>
+        </button>
+      </div>
+    </form>
+
+    {# Answers, questions, and the thinking indicator are injected here. #}
+    <div class="assistant__results" data-assistant-results aria-live="polite"></div>
+  </section>
 {% endblock %}
 
 {% block scripts %}
   <script src="{% static 'js/landing.js' %}" defer></script>
+  <script src="{% static 'js/assistant.js' %}" defer></script>
 {% endblock %}
